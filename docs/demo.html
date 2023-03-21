@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="./viewer.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetra-NeRF: demo</title>
+    <meta name="description" content="This webpage is a demo of Tetra-NeRF - NeRF represented as triangulation of input point cloud.">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-133355320-1"></script><script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'UA-133355320-1');</script>
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+            "three/examples/jsm/": "https://unpkg.com/three@0.150.1/examples/jsm/",
+            "scenes": "https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/scenes.js"
+        }
+    }
+    </script>
+  </head>
+    <body>
+        <div id="viewer-port"></div>
+        <script async type="module" src="viewer.js"></script>
+
+        <div class="container">
+            <section>
+                <h1><strong>Tetra-NeRF</strong> &mdash; demo </h1>
+                <div style="margin-top: -1.245em">
+                    <a href=".">[web]</a>, <a href="https://arxiv.org/pdf/2304.09987.pdf">[paper]</a>
+                </div>
+                <h2>Available scenes</h2>
+                <div class="other-scenes"></div>
+            </section>
+            <section>
+                <h2>Notes</h2>
+                <p style="text-align: justify">
+                    The demo was designed and tested for Google Chrome, but other browsers may also be supported.
+                    Please note, that the demo can be intense for older machines and mobile devices. For that reason, we excluded the dense point clouds and tetrahedra from the visualizations.
+                    In the demo we wanted to minimise the ammount of data needed to download for the demo and we compressed the colour and depth visualizations using a video compression algorithm.
+                    Unfortunatelly, this can cause artefacts to appear in the depth renders. Also, in Google Chrome without hardware-accelerated video decoding you can observe colour flickering.
+                </p>
+                <p>
+                    If you encounter any issues running the demo, please let me know:<br>
+                    <a href="mailto:jonas.kulhanek@cvut.cz">jonas.kulhanek@cvut.cz</a>
+                </p>
+            </section>
+        </div>
+        <script type="module">
+            import { supportedScenes } from "scenes"
+
+            const otherScenesContainer = document.querySelector(".other-scenes");
+            for (const scene of supportedScenes) {
+                const otherSceneLink = document.createElement("a");
+                otherSceneLink.classList.add("scene-link");
+                otherSceneLink.href = `?scene=${scene.slug}`;
+                otherSceneLink.innerHTML = `
+<picture>
+    <source srcset="${scene.cover_image}.webp, ${scene.cover_image}@2x.webp 2x" type="image/webp">
+    <source srcset="${scene.cover_image}.jpg, ${scene.cover_image}@2x.jpb 2x" type="image/jpeg">
+    <img alt="${scene.name}" src="${scene.cover_image}.jpg">
+</picture>
+<div>${scene.name}</div>
+`;
+                otherScenesContainer.appendChild(otherSceneLink);
+            }
+        </script>
+    </body>
+</html>

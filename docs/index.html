@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="style.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetra-NeRF: Representing Neural Radiance Fields Using Tetrahedra</title>
+    <meta name="description" content="This webpage presents Tetra-NeRF - NeRF represented as triangulation of input point cloud. It provides an interactive demo and links to the source code, the paper, and additional materials.">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,700,1,0" />
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-133355320-1"></script><script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'UA-133355320-1');</script>
+  </head>
+  <body>
+    <header>
+      <h1>
+        <span class="title-main">Tetra-NeRF</span>
+        <span class="title-small">Representing Neural Radiance Fields Using Tetrahedra</span>
+      </h1>
+    </header>
+    <div class="authors">
+      <div class="author">
+        <span class="author-name">
+          <a href="https://jkulhanek.github.io/">Jonáš Kulhánek</a>
+        </span>
+        <span class="author-affiliation">Czech Technical University in Prague</span>
+      </div>
+      <div class="author">
+        <span class="author-name">
+          <a href="https://tsattler.github.io/">Torsten Sattler</a>
+        </span>
+        <span class="author-affiliation">Czech Technical University in Prague</span>
+      </div>
+    </div>
+    <div class="links">
+      <a class="link link-paper" href="https://arxiv.org/pdf/2304.09987.pdf">Paper</a>
+      <a class="link link-github" href="https://github.com/jkulhanek/tetra-nerf/">Code</a>
+      <a class="link link-demo" href="./demo.html">Demo</a>
+      <!--<div class="link link-demo">
+        <a href="https://colab.research.google.com/github/jkulhanek/viewformer/blob/master/notebooks/viewformer-playground.ipynb">Demo</a>
+      </div>-->
+    </div>
+    <style>
+      .video.teaser-video::before {
+        padding-bottom: 50%;
+      }
+    </style>
+    <div class="video teaser-video">
+      <video style="object-fit: cover;" width="320" height="240" loop autoplay controls muted>
+        <source src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/intro-video.mp4" type="video/mp4">
+      </video>
+    </div>
+
+    <section class="abstract">
+      <h2>Abstract</h2>
+      <p>
+Neural Radiance Fields (NeRFs) are a very recent and very popular approach for the problems of novel view synthesis and 3D reconstruction. A popular scene representa-
+tion used by NeRFs is to combine a uniform, voxel-based
+subdivision of the scene with an MLP. Based on the observation that a (sparse) point cloud of the scene is often
+available, this paper proposes to use an adaptive representation based on tetrahedra and a Delaunay representation
+instead of the uniform subdivision or point-based representations. We show that such a representation enables effi-
+cient training and leads to state-of-the-art results. Our approach elegantly combines concepts from 3D geometry pro-
+cessing, triangle-based rendering, and modern neural radiance fields. Compared to voxel-based representations, ours
+provides more detail around parts of the scene likely to be
+close to the surface. Compared to point-based representations, our approach achieves better performance.
+      <img src="resources/overview.svg" alt="TetraNeRF overview" style="width: 100%; margin: 1em auto 0.3em auto; display: block;" />
+The input to Tetra-NeRF is a point cloud which is triangulated to get a set of tetrahedra used to represent the radiance field. Rays
+are sampled, and the field is queried. The barycentric interpolation is used to interpolate tetrahedra vertices, and the resulting
+features are passed to a shallow MLP to get the density and colours for volumetric rendering.
+      
+    </section>
+    <section class="demo-section" id="demo">
+      <h2>Demo</h2>
+      <p>
+      We provide interactive demo showing the trained models together with 
+      the original point clouds and tetrahedra. Please visit the <a href="./demo.html"><strong>demo page</strong></a> or click on one of the following:
+      </p>
+      <div class="demo-list">
+        <a class="demo-item" href="./demo.html?scene=blender-lego-sparse">
+          <span class="demo-item-image">
+            <picture>
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover.webp, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover@2x.webp 2x" type="image/webp">
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover.jpg, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover@2x.jpb 2x" type="image/jpeg">
+                <img alt="demo blender lego (sparse)" src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover.gif" />
+            </picture>
+          </span>
+          <span class="caption">blender/lego (sparse)</span>
+        </a>
+        <a class="demo-item" href="./demo.html?scene=360-garden-sparse">
+          <span class="demo-item-image">
+            <picture>
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover.webp, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover@2x.webp 2x" type="image/webp">
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover.jpg, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover@2x.jpb 2x" type="image/jpeg">
+                <img alt="demo mipnerf360 garden (sparse)" src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover.gif" />
+            </picture>
+          </span>
+          <span class="caption">360/garden (sparse)</span>
+        </a>
+        <a class="demo-item" href="./demo.html?scene=360-bonsai-sparse">
+          <span class="demo-item-image">
+            <picture>
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover.webp, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover@2x.webp 2x" type="image/webp">
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover.jpg, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover@2x.jpb 2x" type="image/jpeg">
+                <img alt="demo mipnerf360 bonsai (sparse)" src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover.gif" />
+            </picture>
+          </span>
+          <span class="caption">360/bonsai (sparse)</span>
+        </a>
+        <a class="demo-item"  href="./demo.html?scene=360-kitchen-dense">
+          <span class="demo-item-image">
+            <picture>
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover.webp, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover@2x.webp 2x" type="image/webp">
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover.jpg, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover@2x.jpb 2x" type="image/jpeg">
+                <img alt="demo mipnerf360 kitchen (dense)" src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover.gif" />
+            </picture>
+          </span>
+          <span class="caption">360/kitchen (dense)</span>
+        </a>
+      </div>
+    </section>
+    <section class="citation">
+      <h2>Citation</h2>
+      <span>Please use the following citation:</span>
+      <pre>
+@article{kulhanek2023tetranerf,
+  title={{T}etra-{NeRF}: Representing Neural Radiance Fields Using Tetrahedra},
+  author={Kulhanek, Jonas and Sattler, Torsten},
+  journal={arXiv preprint arXiv:2304.09987},
+  year={2023},
+}</pre>
+    </section>
+<!--<a href="https://github.com/jkulhanek/tetra-nerf/" class="github-corner" aria-label="View source on GitHub"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#151513; color:#fff; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style>-->
+  </body>
+</html>

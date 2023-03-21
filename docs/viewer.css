@@ -1,0 +1,284 @@
+*,
+*:before,
+*:after {
+  box-sizing: border-box;
+}
+
+* {
+  font-family: 'Lato', sans-serif;
+}
+
+a {
+  color: #1772d0;
+}
+
+header {
+  margin: 4em 0px 2em 0px;
+}
+
+body {
+  padding: 0px;
+  margin: 0px;
+}
+
+#viewer-port {
+  position:relative;
+  max-width:100%;
+  box-sizing: border-box;
+  margin: 0px auto;
+
+
+  /* initial setup */
+  aspect-ratio: 800 / 800;
+  max-width: min(100%, 800px);
+  max-height: 800px;
+}
+#viewer-port > * {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 100%;
+  height: 100%;
+}
+
+#viewer-port .controls {
+  display: flex;
+  height: auto;
+  justify-content: center;
+}
+
+#viewer-port .controls > button {
+  font-size: 1.3em;
+  padding: 0.7em 1em; 
+  background-color: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-right: none;
+  outline: none;
+}
+#viewer-port .controls > button:last-child {
+  border-right: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 0 0 0.7em 0;
+}
+#viewer-port .controls > button:first-child {
+  border-radius: 0 0 0 0.7em;
+}
+#viewer-port .controls > button.active {
+  background-color: rgba(251, 252, 169, 0.8);
+  color: black;
+  border: 2px solid white;
+  margin-right: -2px;
+  z-index: 9999;
+}
+
+#viewer-port .controls:hover > button {
+  color: rgba(255, 255, 255, 1.0);
+  background-color: rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-right: none;
+}
+#viewer-port .controls:hover > button:last-child {
+  border-right: 2px solid rgba(255, 255, 255, 0.9);
+}
+#viewer-port .controls:hover > button.active {
+  background-color: rgba(251, 252, 169, 1.0);
+  border: 2px solid white;
+  color: black;
+}
+
+/*
+.loading-progress {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255,0.7);
+  flex-direction: column;
+}
+.loading-progress svg {
+  width: 114px;
+  height: 114px;
+  margin: 1em;
+}
+
+.loading-progress .lp-bg {
+  fill: none;
+  stroke-width: 10px;
+  stroke: #adacac;
+}
+
+.loading-progress .lp-meter {
+  fill: none;
+  stroke-width: 10px;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  
+  stroke: #75731d;
+  stroke-dasharray: 360;
+  stroke-dashoffset: 250;
+  transition: stroke-dashoffset .1s;
+}
+.loading-progress .lp-percentage {
+  font-size: 32px;
+}
+.loading-progress .lp-status {
+  font-size: 1.4em;
+}
+*/
+
+
+.loading-progress {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255,0.7);
+  flex-direction: column;
+}
+
+.loading-progress .lp-error-group {
+  width: 6em;
+  height: auto;
+  margin-bottom: 0.5em;
+}
+
+.loading-progress .lp-progress-group {
+  font-size: 10em;
+
+  width: 1em;
+  height: 1em;
+  float: left;
+  margin: 15px;
+  position: relative;
+}
+
+.loading-progress  .lp-pie {
+  width: 100%;
+  height: 100%;
+  clip: rect(0, 1em, 1em, 0.5em);
+  left: 0;
+  position: absolute;
+  top: 0;
+}
+
+.loading-progress .lp-half-circle {
+  width: 100%;
+  height: 100%;
+  border: 0.1em solid #75731d;
+  border-radius: 50%;
+  clip: rect(0, 0.5em, 1em, 0);
+  left: 0;
+  position: absolute;
+  top: 0;
+}
+
+.loading-progress .lp-label {
+  background: none;
+  color: #333;
+  border-radius: 50%;
+  cursor: default;
+  display: block;
+  font-size: 0.25em;
+  line-height: 2.8em;
+  position: absolute;
+  
+  text-align: center;
+  bottom: 0.4em;
+  left: 0.4em;
+  right: 0.4em;
+  top: 0.4em;
+}
+.loading-progress .lp-label-smaller {
+  color: #555;
+  font-size: 0.45em;
+  padding-bottom: 20px;
+  vertical-align: super;
+}
+
+.loading-progress .lp-shadow {
+  width: 100%;
+  height: 100%;
+  border: 0.1em solid #adacac;;
+  border-radius: 50%;
+}
+
+.other-scenes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5em, 1fr));
+  grid-gap: 1em;
+}
+
+.other-scenes .scene-link {
+  position: relative;
+  min-width: 30%;
+  flex: 1;
+  text-decoration: none;
+  font-weight: bold;
+  color: black;
+}
+
+.other-scenes .scene-link img {
+  width: 100%;
+}
+
+
+
+.container {
+  max-width: 75ch;
+  margin: 0px auto;
+}
+
+h2 {
+  font-weight: 400;
+}
+
+h1 .title-main  {
+  font-weight: 700;
+  display: block;
+  text-align: center;
+}
+
+h1 .title-small  {
+  font-size: 0.8em;
+  display: block;
+  text-align: center;
+  font-weight: 500;
+}
+
+pre {
+  margin-top: 0.2em;
+  font-family: 'Open Sans',sans-serif;
+  font-size: 0.8em;
+  background-color: #eeeeee;
+  padding: 1em 2em 1em 2em;
+  white-space: pre-wrap;
+}
+
+section {
+  margin: 2em 0;
+}
+
+@media (max-width:1120px) {
+  .container {
+    margin: 0px 80px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    margin: 0px 40px;
+  }
+  
+  body {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 400px) {
+  .container {
+    margin: 0px 20px;
+  }
+
+  body {
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,279 @@
+*,
+*:before,
+*:after {
+  box-sizing: border-box;
+}
+
+* {
+  font-family: 'Lato', sans-serif;
+}
+
+a {
+  color: #1772d0;
+}
+
+
+
+header {
+  margin: 4em 0px 2em 0px;
+}
+
+body {
+  max-width: 75ch;
+  margin: 0px auto;
+}
+
+body.wide {
+  max-width: 86%;
+}
+
+h2 {
+  font-weight: 400;
+}
+
+h1 .title-main  {
+  font-weight: 700;
+  display: block;
+  text-align: center;
+}
+
+h1 .title-small  {
+  font-size: 0.8em;
+  display: block;
+  text-align: center;
+  font-weight: 500;
+}
+
+.authors {
+  display: flex;
+  justify-content: center;
+  gap: 1em;
+}
+
+.authors > * {
+  /*padding: 0px 1em;*/
+  flex: 0 1 20ch;
+  margin: 0em 0px 0.8em 0px;
+}
+
+.authors .author-name {
+  font-weight: 700;
+  font-size: 1.1em;
+  display: block;
+  text-align: center;
+  margin-bottom: 0.2em;
+}
+
+.authors .author-name a {
+  text-decoration: none;
+  color: black;
+}
+
+.authors .author-affiliation {
+  display: block;
+  text-align: center;
+}
+
+.links {
+  margin: 1em auto 1em auto;
+  text-align: center;
+}
+
+.links .link {
+  display: inline-block;
+  padding: 0 0.2em;
+  text-decoration: none;
+  background-color: #195a66;
+  color: #ecf0f1;
+  font-size: 1.3em;
+  font-weight: bold;
+  padding: 0.3em 0.5em 0.4em 0.4em;
+  margin: 0.3em 0.2em;
+  transition: all 0.4s;
+}
+
+.links .link:hover {
+  background-color: #5e8c94;
+  color: white;
+}
+
+.link::before {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 1em;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  content: '';
+  vertical-align: -0.2em;
+  margin-right: 0.2em;
+}
+
+.link.link-paper::before {
+  content: "description"
+}
+
+.link.link-github::before {
+  content: "code"
+}
+
+.link.link-demo::before {
+  content: "rocket_launch"
+}
+
+
+.video {
+  position: relative;
+}
+
+.video::before {
+  display: block;
+  padding-bottom: 37.5%;
+  content: '';
+}
+
+.video.d16x9::before {
+  padding-bottom: 56.25%;
+}
+
+.video video,
+.video iframe{
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 100%;
+  height: 100%;
+}
+
+.abstract p {
+  text-align: justify;
+}
+
+.references div {
+  text-align: justify;
+  font-size: 0.9em;
+}
+
+.citation {
+  color: black;
+}
+
+pre {
+  margin-top: 0.2em;
+  font-family: 'Open Sans',sans-serif;
+  font-size: 0.8em;
+  background-color: #eeeeee;
+  padding: 1em 2em 1em 2em;
+  white-space: pre-wrap;
+}
+
+section {
+  margin: 2em 0;
+}
+
+.demo-list {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1em;
+}
+
+.demo-item {
+  width: auto;
+  display: block;
+  text-decoration: none;
+}
+
+.demo-item-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5/4;
+  overflow: hidden;
+  display: block;
+}
+
+.demo-item .caption {
+  text-align: center;
+  width: 100%;
+  color: #333;
+  display: block;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.demo-item-image:hover img {
+  width: 120%;
+  height: 120%;
+  top: -10%;
+  left: -10%;
+}
+
+.demo-item-image img {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  object-fit: cover;
+  transition: all 0.2s ease-out;
+}
+
+.demo-item-image::after {
+  content: ' ';
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.0);
+  display: block;
+  position: absolute;
+  transition: all 0.2s ease-out;
+}
+
+.demo-item-image:hover::after {
+  background: rgba(0,0,0,0.5);
+}
+
+@media (max-width:1120px) {
+  html {
+    padding: 0px 80px;
+  }
+}
+
+@media (max-width: 768px) {
+  .github-corner {
+    display: none;
+  }
+
+  html {
+    padding: 0px 40px;
+  }
+
+  body {
+    font-size: 14px;
+  }
+
+  .authors > * {
+    padding: 0px 1em;
+    flex: 1 1 0px;
+  }
+
+}
+
+@media (max-width: 400px) {
+  html {
+    padding: 0px 20px;
+  }
+  body {
+    font-size: 12px;
+  }
+
+  .demo-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+  
