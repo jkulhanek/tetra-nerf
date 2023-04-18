@@ -167,7 +167,7 @@ TetrahedraTracer::TetrahedraTracer(int8_t device) {
         module_compile_options.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
 
 // The following is not supported in Optix 7.2
-#if(OPTIX_ABI_VERSION > 67)
+#if(OPTIX_ABI_VERSION > 54)
         module_compile_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL;
 #else
         module_compile_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;

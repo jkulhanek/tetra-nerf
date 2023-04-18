@@ -189,16 +189,18 @@ torch::Tensor py_interpolate_values(const torch::Tensor &vertex_indices,
     CHECK_INPUT(barycentric_coordinates);
     CHECK_INPUT(field);
     const size_t num_values = vertex_indices.numel() / 4;
-    const size_t field_dim = field.size(-1);
-    const auto result = torch::empty({barycentric_coordinates.size(0), barycentric_coordinates.size(1), field.size(-1)}, torch::device(field.device()).dtype(field.dtype()));
+    const size_t field_dim = field.size(0);
+    const size_t num_vertices = field.size(1);
+    const auto result = torch::empty({(long)field_dim, barycentric_coordinates.size(0), barycentric_coordinates.size(1)}, torch::device(field.device()).dtype(field.dtype()));
     interpolate_values(
         num_values,
         field_dim,
+        num_vertices,
         reinterpret_cast<uint4 *>(vertex_indices.data_ptr()),
         reinterpret_cast<float4 *>(barycentric_coordinates.data_ptr()),
         reinterpret_cast<float *>(field.data_ptr()),
         reinterpret_cast<float *>(result.data_ptr()));
-    return result;
+    return result.permute({1, 2, 0});
     const auto points = field.index({vertex_indices.to(torch::kLong)});
     std::cout << points.sizes() << std::endl;
     std::cout << vertex_indices.sizes() << std::endl;
@@ -219,16 +221,17 @@ torch::Tensor py_interpolate_values_backward(const torch::Tensor &vertex_indices
     CHECK_INPUT(grad_in);
     // TODO: implement grad computation wrt barycentric coords for pose optimisation
     const size_t num_values = vertex_indices.numel() / 4;
-    const size_t field_dim = field.size(-1);
-    const size_t num_vertices = field.size(0);
-    const auto grad_field_out = torch::zeros({(long)num_vertices, (long)field_dim}, torch::device(grad_in.device()).dtype(grad_in.dtype()));
+    const size_t field_dim = field.size(0);
+    const size_t num_vertices = field.size(-1);
+    TORCH_CHECK(grad_in.size(-1) == field_dim, "grad_in must have shape [..., field_dim]");
+    const auto grad_field_out = torch::zeros({(long)field_dim, (long)num_vertices}, torch::device(grad_in.device()).dtype(grad_in.dtype()));
     interpolate_values_backward(
         num_vertices,
         num_values,
         field_dim,
         reinterpret_cast<uint4 *>(vertex_indices.data_ptr()),
         reinterpret_cast<float4 *>(barycentric_coordinates.data_ptr()),
-        reinterpret_cast<float *>(grad_in.data_ptr()),
+        reinterpret_cast<float *>(grad_in.moveaxis(-1, 0).contiguous().data_ptr()),
         reinterpret_cast<float *>(grad_field_out.data_ptr()));
     return grad_field_out;
 }

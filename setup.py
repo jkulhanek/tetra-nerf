@@ -89,23 +89,6 @@ class CMakeBuild(Command):
         # # Can be set with Conda-Build, for example.
         # cmake_generator = os.environ.get("CMAKE_GENERATOR", "")
 
-        # Using Ninja-build since it a) is available as a wheel and b)
-        # multithreads automatically. MSVC would require all variables be
-        # exported for Ninja to pick it up, which is a little tricky to do.
-        # Users can override the generator with CMAKE_GENERATOR in CMake
-        # 3.15+.
-        # if not cmake_generator or cmake_generator == "Ninja":
-        #     try:
-        #         import ninja
-
-        #         ninja_executable_path = Path(ninja.BIN_DIR) / "ninja"
-        #         cmake_args += [
-        #             "-GNinja",
-        #             f"-DCMAKE_MAKE_PROGRAM:FILEPATH={ninja_executable_path}",
-        #         ]
-        #     except ImportError:
-        #         pass
-
         if sys.platform.startswith("darwin"):
             # Cross-compile support for macOS - respect ARCHFLAGS if set
             archs = re.findall(r"-arch (\S+)", os.environ.get("ARCHFLAGS", ""))
@@ -138,7 +121,7 @@ class CMakeBuild(Command):
 # logic and declaration, and simpler if you include description/version in a file.
 setup(
     name="tetra-nerf",
-    version="0.1.0",
+    version="0.1.1",
     author="Jonas Kulhanek",
     author_email="jonas.kulhanek@live.com",
     description="Official implementation of Tetra-NeRF paper",
@@ -147,14 +130,14 @@ setup(
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,
     python_requires=">=3.7",
-    install_requires=["trimesh>=3.20.2"],
+    install_requires=["trimesh>=3.20.2", "nerfstudio==0.2.0"],
     extras_require={
         "dev": [
             "black[jupyter]==22.3.0",
             "pylint==2.13.4",
             "pytest==7.1.2",
             "pytest-xdist==2.5.0",
-            "typeguard>=2.13.3",
+            "typeguard==2.13.3",
             "pre-commit>=3.1.1",
         ]
     },

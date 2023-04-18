@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import nerfstudio.utils
 import torch
-from nerfstudio.cameras.rays import RayBundle
+from nerfstudio.cameras.rays import RayBundle, RaySamples
 from nerfstudio.field_components.encodings import NeRFEncoding
 from nerfstudio.field_components.field_heads import (
     DensityFieldHead,
@@ -37,15 +37,29 @@ from ..utils.extension import TetrahedraTracer, interpolate_values
 
 CONSOLE = Console(width=120)
 
+try:
+    import dm_pix as pix
+    import jax
 
-# Scikit implementation used in PointNeRF
-def scikit_ssim(image, rgb):
+    jax_ssim = jax.jit(pix.ssim)
+
+    def mipnerf_ssim(image, rgb):
+        values = [
+            float(jax_ssim(gt, img))
+            for gt, img in zip(image.cpu().permute(0, 2, 3, 1).numpy(), rgb.cpu().permute(0, 2, 3, 1).numpy())
+        ]
+        return sum(values) / len(values)
+
+except ImportError:
+    CONSOLE.print("[yellow]JAX not installed, skipping Mip-NeRF SSIM[/yellow]")
+    mipnerf_ssim = None
+
+
+def skimage_ssim(image, rgb):
+    # Scikit implementation used in PointNeRF
     values = [
-        structural_similarity(gt, img, win_size=11, multichannel=True)
-        for gt, img in zip(
-            image.cpu().permute(0, 2, 3, 1).numpy(),
-            rgb.cpu().permute(0, 2, 3, 1).numpy(),
-        )
+        structural_similarity(gt, img, win_size=11, multichannel=True, channel_axis=2, data_range=1.0)
+        for gt, img in zip(image.cpu().permute(0, 2, 3, 1).numpy(), rgb.cpu().permute(0, 2, 3, 1).numpy())
     ]
     return sum(values) / len(values)
 
@@ -59,6 +73,7 @@ class TetrahedraNerfConfig(ModelConfig):
 
     max_intersected_triangles: int = 512  # TODO: try 1024
     num_samples: int = 256
+    num_fine_samples: int = 256
     field_dim: int = 64
 
     num_color_layers: int = 1
@@ -68,8 +83,6 @@ class TetrahedraNerfConfig(ModelConfig):
     input_fourier_frequencies: int = 0
 
     initialize_colors: bool = True
-
-    use_scikit_ssim_implementation: bool = True
 
     def __post_init__(self):
         if self.tetrahedra_path is not None and self.num_tetrahedra_vertices is None:
@@ -119,12 +132,31 @@ class TetrahedraNerf(Model):
             "tetrahedra_field",
             nn.Parameter(
                 torch.empty(
-                    (self.config.num_tetrahedra_vertices, self.config.field_dim),
+                    (self.config.field_dim, self.config.num_tetrahedra_vertices),
                     dtype=torch.float32,
                 )
             ),
         )
         self._tetrahedra_initialized = False
+
+    # Just to allow for size reduction of the checkpoint
+    def load_state_dict(self, state_dict, strict: bool = True):
+        for k, v in self.lpips.state_dict().items():
+            state_dict[f"lpips.{k}"] = v
+        if hasattr(self, "lpips_vgg"):
+            for k, v in self.lpips_vgg.state_dict().items():
+                state_dict[f"lpips_vgg.{k}"] = v
+        return super().load_state_dict(state_dict, strict)
+
+    # Just to allow for size reduction of the checkpoint
+    def state_dict(self, *args, **kwargs):
+        state_dict = super().state_dict(*args, **kwargs)
+        for k in self.lpips.state_dict():
+            state_dict.pop(f"lpips.{k}")
+        if hasattr(self, "lpips_vgg"):
+            for k in self.lpips_vgg.state_dict():
+                state_dict.pop(f"lpips_vgg.{k}")
+        return state_dict
 
     @staticmethod
     def _init_tetrahedra_field(tetrahedra_field):
@@ -196,8 +228,8 @@ class TetrahedraNerf(Model):
                 assert tetrahedra["colors"].dtype == torch.uint8
                 assert tetrahedra["colors"].shape == (num_tetrahedra_vertices, 4)
                 colors = tetrahedra["colors"].float().to(self.tetrahedra_field.device) * 2.0 / 255.0 - 1.0
-                self.tetrahedra_field.data[:, 1:4] = colors[:, :3]
-                self.tetrahedra_field.data[:, 0] = colors[:, 3]
+                self.tetrahedra_field.data[1:4, :] = colors[:, :3].T
+                self.tetrahedra_field.data[0, :] = colors[:, 3]
             CONSOLE.print(f"Tetrahedra initialized from file {self.config.tetrahedra_path}:")
             CONSOLE.print(f"    Num points: {len(self.tetrahedra_vertices)}")
             CONSOLE.print(f"    Num tetrahedra: {len(self.tetrahedra_cells)}")
@@ -262,7 +294,8 @@ class TetrahedraNerf(Model):
 
         # samplers
         self.sampler_uniform = UniformSampler(num_samples=self.config.num_samples)
-        self.sampler_pdf = PDFSampler(num_samples=self.config.num_samples)
+        if self.config.num_fine_samples > 0:
+            self.sampler_pdf = PDFSampler(num_samples=self.config.num_fine_samples)
 
         # renderers
         self._background_color = nerfstudio.utils.colors.WHITE
@@ -275,10 +308,8 @@ class TetrahedraNerf(Model):
 
         # metrics
         self.psnr = PeakSignalNoiseRatio(data_range=1.0)
-        if self.config.use_scikit_ssim_implementation:
-            self.ssim = scikit_ssim
-        else:
-            self.ssim = structural_similarity_index_measure
+        self.skimage_ssim = skimage_ssim
+        self.nerfstudio_ssim = structural_similarity_index_measure
         self.lpips = LearnedPerceptualImagePatchSimilarity()
         # self.lpips_vgg = LearnedPerceptualImagePatchSimilarity(net_type="vgg")
 
@@ -319,7 +350,7 @@ class TetrahedraNerf(Model):
         fars_r = fars[ray_mask]
         if nears_r.shape[0] > 0:
             ray_bundle_modified_r = dataclasses.replace(ray_bundle[ray_mask], nears=nears_r, fars=fars_r)
-            ray_samples_r = self.sampler_uniform(ray_bundle_modified_r)
+            ray_samples_r: RaySamples = self.sampler_uniform(ray_bundle_modified_r)
             distances_r = (ray_samples_r.frustums.ends + ray_samples_r.frustums.starts) / 2
 
             # Trace matched cells and interpolate field
@@ -337,30 +368,31 @@ class TetrahedraNerf(Model):
                 self.tetrahedra_field,
             )
 
-            # apply MLP on top
-            encoded_abc = self.position_encoding(field_values)
-            base_mlp_out = self.mlp_base(encoded_abc)
+            if self.config.num_fine_samples > 0:
+                # apply MLP on top
+                encoded_abc = self.position_encoding(field_values)
+                base_mlp_out = self.mlp_base(encoded_abc)
 
-            # Apply dense, fine sampling
-            density_coarse = self.field_output_density(base_mlp_out)
-            weights = ray_samples_r.get_weights(density_coarse)
-            # pdf sampling
-            ray_samples_r = self.sampler_pdf(ray_bundle_modified_r, ray_samples_r, weights)
-            distances_r = (ray_samples_r.frustums.ends + ray_samples_r.frustums.starts) / 2
+                # Apply dense, fine sampling
+                density_coarse = self.field_output_density(base_mlp_out)
+                weights = ray_samples_r.get_weights(density_coarse)
+                # pdf sampling
+                ray_samples_r = self.sampler_pdf(ray_bundle_modified_r, ray_samples_r, weights)
+                distances_r = (ray_samples_r.frustums.ends + ray_samples_r.frustums.starts) / 2
 
-            traced_cells = tracer.find_visited_cells(
-                tracer_output["num_visited_cells"][ray_mask],
-                tracer_output["visited_cells"][ray_mask],
-                tracer_output["barycentric_coordinates"][ray_mask],
-                tracer_output["hit_distances"][ray_mask],
-                distances_r.squeeze(-1),
-            )
-            barycentric_coords = traced_cells["barycentric_coordinates"]
-            field_values = interpolate_values(
-                traced_cells["vertex_indices"],
-                barycentric_coords,
-                self.tetrahedra_field,
-            )
+                traced_cells = tracer.find_visited_cells(
+                    tracer_output["num_visited_cells"][ray_mask],
+                    tracer_output["visited_cells"][ray_mask],
+                    tracer_output["barycentric_coordinates"][ray_mask],
+                    tracer_output["hit_distances"][ray_mask],
+                    distances_r.squeeze(-1),
+                )
+                barycentric_coords = traced_cells["barycentric_coordinates"]
+                field_values = interpolate_values(
+                    traced_cells["vertex_indices"],
+                    barycentric_coords,
+                    self.tetrahedra_field,
+                )
 
             encoded_abc = self.position_encoding(field_values)
             base_mlp_out = self.mlp_base(encoded_abc)
@@ -440,16 +472,19 @@ class TetrahedraNerf(Model):
         rgb = torch.moveaxis(rgb, -1, 0)[None, ...]
 
         psnr = self.psnr(image, rgb)
-        ssim = self.ssim(image, rgb)
         lpips = self.lpips(image, rgb)
-        # lpips_vgg = self.lpips_vgg(image, rgb)
 
         metrics_dict = {
             "psnr": float(psnr.item()),
-            "ssim": float(ssim),
             "lpips": float(lpips),
-            # "lpips_vgg": float(lpips_vgg),
+            # "lpips_vgg": float(self.lpips_vgg(image, rgb)),
+            "nerfstudio_ssim": float(self.nerfstudio_ssim(image, rgb)),
+            "skimage_ssim": float(self.skimage_ssim(image, rgb)),
+            "lpips": float(lpips),
         }
+        if mipnerf_ssim is not None:
+            metrics_dict["mipnerf_ssim"] = float(mipnerf_ssim(image, rgb))
+
         images_dict = {
             "img": combined_rgb,
             "accumulation": combined_acc,

@@ -96,6 +96,7 @@ void find_matched_cells(const size_t num_rays,
 void interpolate_values(
     const size_t num_values,
     const size_t field_dim,
+    const size_t num_vertices,
     const uint4 *vertex_indices,
     const float4 *barycentric_coordinates,
     const float *field,

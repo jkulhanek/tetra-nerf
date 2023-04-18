@@ -120,7 +120,7 @@ First, make sure to install the following:
 ```
 CUDA (>=11.3)
 torch (>=1.12.1)
-nerfstudio (==0.1.20 or git+https://github.com/nerfstudio-project/nerfstudio.git@2c79d9fe52ae2eef2887aa621ae701ef91da95b0)
+nerfstudio (==0.2.0)
 OptiX (>=7.2, preferably 7.6)
 CGAL (we used 5.5.1)
 CMake (>=3.25)
@@ -140,6 +140,9 @@ Finally, you can install **Tetra-NeRF** by running:
 ```
 pip install git+https://github.com/jkulhanek/tetra-nerf
 ```
+
+### Docker
+Alternatively, you can also build and run the `tetra-nerf` in a docker container. Use the `Dockerfile` file to build the image.
 
 ## Thanks
 This project is built on [NerfStudio](https://docs.nerf.studio/en/latest/)<br>

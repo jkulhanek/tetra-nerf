@@ -264,20 +264,23 @@ void find_matched_cells(const size_t num_rays,
 
 __global__ void interpolate_values_kernel(const size_t num_values,
                                           const size_t field_dim,
+                                          const size_t num_vertices,
                                           const uint4 *vertex_indices,
                                           const float4 *barycentric_coordinates,
                                           const float *field,
                                           float *result) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    for (size_t i = index; i < num_values; i += stride) {
-        for (size_t j = 0; j < field_dim; ++j) {
-            result[i * field_dim + j] = (barycentric_coordinates[i].x * field[vertex_indices[i].x * field_dim + j] +
-                                         barycentric_coordinates[i].y * field[vertex_indices[i].y * field_dim + j] +
-                                         barycentric_coordinates[i].z * field[vertex_indices[i].z * field_dim + j] +
-                                         barycentric_coordinates[i].w * field[vertex_indices[i].w * field_dim + j]);
-        }
-    }
+    unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= num_values) return;
+
+    unsigned int j = blockIdx.y;
+    unsigned int i = index;
+
+    const auto bc = barycentric_coordinates[i];
+    const auto vi = vertex_indices[i];
+    result[j * num_values + i] = (bc.x * field[j * num_vertices + vi.x] +
+                                  bc.y * field[j * num_vertices + vi.y] +
+                                  bc.z * field[j * num_vertices + vi.z] +
+                                  bc.w * field[j * num_vertices + vi.w]);
 }
 
 __global__ void interpolate_values_backward_kernel(const size_t num_vertices,
@@ -288,27 +291,32 @@ __global__ void interpolate_values_backward_kernel(const size_t num_vertices,
                                                    const float *grad_in,
                                                    float *field_grad_out) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    for (size_t i = index; i < num_values; i += stride) {
-        for (size_t j = 0; j < field_dim; ++j) {
-            atomicAdd(&field_grad_out[vertex_indices[i].x * field_dim + j], barycentric_coordinates[i].x * grad_in[i * field_dim + j]);
-            atomicAdd(&field_grad_out[vertex_indices[i].y * field_dim + j], barycentric_coordinates[i].y * grad_in[i * field_dim + j]);
-            atomicAdd(&field_grad_out[vertex_indices[i].z * field_dim + j], barycentric_coordinates[i].z * grad_in[i * field_dim + j]);
-            atomicAdd(&field_grad_out[vertex_indices[i].w * field_dim + j], barycentric_coordinates[i].w * grad_in[i * field_dim + j]);
-        }
-    }
+    if (index >= num_values) return;
+
+    unsigned int j = blockIdx.y;
+    unsigned int i = index;
+
+    const auto lgradin = grad_in[j * num_values + i];
+    const auto bc = barycentric_coordinates[i];
+    const auto vi = vertex_indices[i];
+    atomicAdd(&field_grad_out[j * num_vertices + vi.x], bc.x * lgradin);
+    atomicAdd(&field_grad_out[j * num_vertices + vi.y], bc.y * lgradin);
+    atomicAdd(&field_grad_out[j * num_vertices + vi.z], bc.z * lgradin);
+    atomicAdd(&field_grad_out[j * num_vertices + vi.w], bc.w * lgradin);
 }
 
 void interpolate_values(const size_t num_values,
                         const size_t field_dim,
+                        const size_t num_vertices,
                         const uint4 *vertex_indices,
                         const float4 *barycentric_coordinates,
                         const float *field,
                         float *result) {
     const size_t block_size = 1024;
-    interpolate_values_kernel<<<(num_values + block_size - 1) / block_size, block_size>>>(
+    interpolate_values_kernel<<<dim3((num_values + block_size - 1) / block_size, field_dim), block_size>>>(
         num_values,
         field_dim,
+        num_vertices,
         vertex_indices,
         barycentric_coordinates,
         field,
@@ -323,7 +331,7 @@ void interpolate_values_backward(const size_t num_vertices,
                                  const float *grad_in,
                                  float *field_grad_out) {
     const size_t block_size = 1024;
-    interpolate_values_backward_kernel<<<(num_values + block_size - 1) / block_size, block_size>>>(
+    interpolate_values_backward_kernel<<<dim3((num_values + block_size - 1) / block_size, field_dim), block_size>>>(
         num_vertices,
         num_values,
         field_dim,
