@@ -144,6 +144,17 @@ pip install git+https://github.com/jkulhanek/tetra-nerf
 ### Docker
 Alternatively, you can also build and run the `tetra-nerf` in a docker container. Use the `Dockerfile` file to build the image.
 
+## Checkpoints and predictions
+To enable easier comparisons with our method we further provide pretrained checkpoints for all scenes on all evaluated datasets.
+We also publish the predicted images for the test sets.
+
+| Dataset  | Checkpoints | Predictions | Input tetrahedra |
+| -------- | ----------- | ----------- | ---------------- |
+| Mip-NeRF 360 (public scenes) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-checkpoints.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-tetrahedra.tar.gz) |
+| Blender | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/blender-checkpoints.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/blender-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/blender-tetrahedra.tar.gz) |
+| Tanks and Temples | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/nsvf-tanks-and-temples-checkpoints.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/nsvf-tanks-and-temples-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/nsvf-tanks-and-temples-tetrahedra.tar.gz) |
+
+
 ## Thanks
 This project is built on [NerfStudio](https://docs.nerf.studio/en/latest/)<br>
 [<img alt="NerfStudio logo" src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/nerfstudio-logo.png" width="300" />](https://docs.nerf.studio/en/latest/)<br>
