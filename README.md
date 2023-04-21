@@ -1,8 +1,8 @@
 # Tetra-NeRF
 Official implementation of **Tetra-NeRF paper**
 
-### [Project Page](https://jkulhanek.com/tetra-nerf) | [Paper]() | [Demo](https://jkulhanek.com/tetra-nerf/demo.html)<br><br>
-[Tetra-NeRF: Representing Neural Radiance Fields Using Tetrahedra]()<br>
+### [Project Page](https://jkulhanek.com/tetra-nerf) | [Paper](https://arxiv.org/pdf/2304.09987.pdf) | [Demo](https://jkulhanek.com/tetra-nerf/demo.html)<br><br>
+[Tetra-NeRF: Representing Neural Radiance Fields Using Tetrahedra](https://jkulhanek.com/tetra-nerf)<br>
 *[Jonas Kulhanek](https://jkulhanek.com)<sup>1</sup>, [Torsten Sattler](https://tsattler.github.io/)<sup>1</sup>*<br>
 <sup>1</sup> Czech Technical University in Prague<br>
 
@@ -112,9 +112,6 @@ ns-train tetra-nerf --pipeline.model.tetrahedra-path data/nsvf-tanks-and-temples
 ns-train tetra-nerf --pipeline.model.tetrahedra-path data/mipnerf360/<scene>/dense-1M.th minimal-parser --data data/mipnerf360/<scene>
 ```
 
-### Trained checkpoints and generated images
-We are currently working on releasing the **trained checkpoints** and generated images. Please stay tuned!
-
 ## Installation
 First, make sure to install the following:
 ```
@@ -163,7 +160,10 @@ Fast ray-tracing is enabled by [NVIDIA OptiX](https://developer.nvidia.com/rtx/r
 ## Citing
 If you use our work or build on top of it, please use the following citation:
 ```bibtex
-@article{
-
+@article{kulhanek2023tetranerf,
+  title={{T}etra-{NeRF}: Representing Neural Radiance Fields Using Tetrahedra},
+  author={Kulhanek, Jonas and Sattler, Torsten},
+  journal={arXiv preprint arXiv:2304.09987},
+  year={2023},
 }
 ```
