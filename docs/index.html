@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="style.css" />
@@ -54,20 +55,9 @@
     <section class="abstract">
       <h2>Abstract</h2>
       <p>
-Neural Radiance Fields (NeRFs) are a very recent and very popular approach for the problems of novel view synthesis and 3D reconstruction. A popular scene representa-
-tion used by NeRFs is to combine a uniform, voxel-based
-subdivision of the scene with an MLP. Based on the observation that a (sparse) point cloud of the scene is often
-available, this paper proposes to use an adaptive representation based on tetrahedra and a Delaunay representation
-instead of the uniform subdivision or point-based representations. We show that such a representation enables effi-
-cient training and leads to state-of-the-art results. Our approach elegantly combines concepts from 3D geometry pro-
-cessing, triangle-based rendering, and modern neural radiance fields. Compared to voxel-based representations, ours
-provides more detail around parts of the scene likely to be
-close to the surface. Compared to point-based representations, our approach achieves better performance.
+Neural Radiance Fields (NeRFs) are a very recent and very popular approach for the problems of novel view synthesis and 3D reconstruction. A popular scene representation used by NeRFs is to combine a uniform, voxel-based subdivision of the scene with an MLP. Based on the observation that a (sparse) point cloud of the scene is often available, this paper proposes to use an adaptive representation based on tetrahedra and a Delaunay representation instead of the uniform subdivision or point-based representations. We show that such a representation enables efficient training and leads to state-of-the-art results. Our approach elegantly combines concepts from 3D geometry processing, triangle-based rendering, and modern neural radiance fields. Compared to voxel-based representations, ours provides more detail around parts of the scene likely to be close to the surface. Compared to point-based representations, our approach achieves better performance.
       <img src="resources/overview.svg" alt="TetraNeRF overview" style="width: 100%; margin: 1em auto 0.3em auto; display: block;" />
-The input to Tetra-NeRF is a point cloud which is triangulated to get a set of tetrahedra used to represent the radiance field. Rays
-are sampled, and the field is queried. The barycentric interpolation is used to interpolate tetrahedra vertices, and the resulting
-features are passed to a shallow MLP to get the density and colours for volumetric rendering.
-      
+The input to Tetra-NeRF is a point cloud which is triangulated to get a set of tetrahedra used to represent the radiance field. Rays are sampled, and the field is queried. The barycentric interpolation is used to interpolate tetrahedra vertices, and the resulting features are passed to a shallow MLP to get the density and colours for volumetric rendering.
     </section>
     <section class="demo-section" id="demo">
       <h2>Demo</h2>
@@ -80,7 +70,7 @@ features are passed to a shallow MLP to get the density and colours for volumetr
           <span class="demo-item-image">
             <picture>
                 <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover.webp, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover@2x.webp 2x" type="image/webp">
-                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover.jpg, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover@2x.jpb 2x" type="image/jpeg">
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover.gif, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover@2x.gif 2x" type="image/gif">
                 <img alt="demo blender lego (sparse)" src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover.gif" />
             </picture>
           </span>
@@ -90,7 +80,7 @@ features are passed to a shallow MLP to get the density and colours for volumetr
           <span class="demo-item-image">
             <picture>
                 <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover.webp, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover@2x.webp 2x" type="image/webp">
-                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover.jpg, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover@2x.jpb 2x" type="image/jpeg">
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover.gif, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover@2x.gif 2x" type="image/gif">
                 <img alt="demo mipnerf360 garden (sparse)" src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover.gif" />
             </picture>
           </span>
@@ -100,7 +90,7 @@ features are passed to a shallow MLP to get the density and colours for volumetr
           <span class="demo-item-image">
             <picture>
                 <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover.webp, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover@2x.webp 2x" type="image/webp">
-                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover.jpg, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover@2x.jpb 2x" type="image/jpeg">
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover.gif, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover@2x.gif 2x" type="image/gif">
                 <img alt="demo mipnerf360 bonsai (sparse)" src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover.gif" />
             </picture>
           </span>
@@ -110,7 +100,7 @@ features are passed to a shallow MLP to get the density and colours for volumetr
           <span class="demo-item-image">
             <picture>
                 <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover.webp, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover@2x.webp 2x" type="image/webp">
-                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover.jpg, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover@2x.jpb 2x" type="image/jpeg">
+                <source srcset="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover.gif, https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover@2x.gif 2x" type="image/gif">
                 <img alt="demo mipnerf360 kitchen (dense)" src="https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover.gif" />
             </picture>
           </span>
