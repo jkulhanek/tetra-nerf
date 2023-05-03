@@ -49,7 +49,7 @@ first with all images to get the camera poses of all images and the second from 
 Finally, generate the tetrahedra and start the training:
 ```bash
 python -m tetranerf.scripts.triangulate --pointcloud <data folder>/sparse.ply --output <data folder>/sparse.th
-ns-train tetra-nerf --pipeline.model.tetranerf-path <data folder>/sparse.th minimal-parser --data <data folder>
+ns-train tetra-nerf --pipeline.model.tetrahedra-path <data folder>/sparse.th minimal-parser --data <data folder>
 ```
 
 ### With existing COLMAP
@@ -120,11 +120,11 @@ ns-train tetra-nerf-original --pipeline.model.tetrahedra-path data/mipnerf360/<s
 First, make sure to install the following:
 ```
 CUDA (>=11.3)
-torch (>=1.12.1)
-nerfstudio (==0.2.0)
+PyTorch (>=1.12.1)
+Nerfstudio (>=0.2.0)
 OptiX (>=7.2, preferably 7.6)
-CGAL (we used 5.5.1)
-CMake (>=3.25)
+CGAL
+CMake (>=3.22.1)
 ```
 We recommend using a conda environment, `CMake`, `CGAL`, `torch` can be easily installed using `conda install`.
 Our code was tested with `python 3.10`, but any `python>=3.7` should be also supported.

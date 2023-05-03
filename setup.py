@@ -130,7 +130,7 @@ setup(
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,
     python_requires=">=3.7",
-    install_requires=["trimesh>=3.20.2", "nerfstudio==0.2.0"],
+    install_requires=["trimesh>=3.20.2", "nerfstudio>=0.2.0"],
     extras_require={
         "dev": [
             "black[jupyter]==22.3.0",
