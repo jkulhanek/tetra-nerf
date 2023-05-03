@@ -17,7 +17,7 @@ from nerfstudio.field_components.field_heads import (
 from nerfstudio.field_components.mlp import MLP
 from nerfstudio.model_components import renderers
 from nerfstudio.model_components.losses import MSELoss
-from nerfstudio.model_components.ray_samplers import PDFSampler, UniformSampler
+from nerfstudio.model_components.ray_samplers import PDFSampler, Sampler, UniformSampler
 from nerfstudio.model_components.renderers import (
     AccumulationRenderer,
     DepthRenderer,
@@ -74,6 +74,7 @@ class TetrahedraNerfConfig(ModelConfig):
     max_intersected_triangles: int = 512  # TODO: try 1024
     num_samples: int = 256
     num_fine_samples: int = 256
+    use_biased_sampler: bool = False
     field_dim: int = 64
 
     num_color_layers: int = 1
@@ -91,6 +92,93 @@ class TetrahedraNerfConfig(ModelConfig):
             tetrahedra = torch.load(self.tetrahedra_path)
             self.num_tetrahedra_vertices = len(tetrahedra["vertices"])
             self.num_tetrahedra_cells = len(tetrahedra["cells"])
+
+
+# Map from uniform space to transformed space
+def map_from_real_distances_to_biased_with_bounds(num_bounds, bounds, samples):
+    lengths = bounds[..., 1] - bounds[..., 0]
+    sum_lengths = lengths.sum(-1)
+    part_len = sum_lengths / num_bounds
+    bounds_start = bounds[..., 0, 0]
+    bounds_end = torch.gather(bounds[..., 1], 1, (num_bounds[:, None] - 1).clamp_min_(0)).squeeze(-1)
+    rest = (samples - bounds_start[..., None]) / (bounds_end - bounds_start)[..., None]
+    rest *= num_bounds[..., None]
+    intervals = rest.floor().clamp_max_(num_bounds[..., None] - 1).clamp_min_(0)
+    rest = rest - intervals
+    intervals = intervals.long()
+    cum_lengths = torch.cumsum(torch.cat((bounds_start[:, None], lengths), 1), 1)
+    mapped_samples = torch.gather(cum_lengths, 1, intervals) + torch.gather(lengths, 1, intervals) * rest
+    return mapped_samples
+
+
+class TetrahedraSampler(Sampler):
+    """Sample points according to a function.
+
+    Args:
+        num_samples: Number of samples per ray
+        train_stratified: Use stratified sampling during training. Defaults to True
+    """
+
+    def __init__(
+        self,
+        num_samples: Optional[int] = None,
+        train_stratified=True,
+    ) -> None:
+        super().__init__(num_samples=num_samples)
+        self.train_stratified = train_stratified
+
+    def generate_ray_samples(
+        self,
+        ray_bundle: Optional[RayBundle] = None,
+        num_samples: Optional[int] = None,
+        *,
+        num_visited_cells,
+        hit_distances,
+    ) -> RaySamples:
+        """Generates position samples according to spacing function.
+
+        Args:
+            ray_bundle: Rays to generate samples for
+            num_samples: Number of samples per ray
+
+        Returns:
+            Positions and deltas for samples along a ray
+        """
+        assert ray_bundle is not None
+        assert ray_bundle.nears is not None
+        assert ray_bundle.fars is not None
+
+        num_samples = num_samples or self.num_samples
+        assert num_samples is not None
+        num_rays = ray_bundle.origins.shape[0]
+
+        bins = torch.linspace(0.0, 1.0, num_samples + 1).to(ray_bundle.origins.device)[None, ...]  # [1, num_samples+1]
+
+        # TODO More complicated than it needs to be.
+        if self.train_stratified and self.training:
+            t_rand = torch.rand((num_rays, num_samples + 1), dtype=bins.dtype, device=bins.device)
+            bin_centers = (bins[..., 1:] + bins[..., :-1]) / 2.0
+            bin_upper = torch.cat([bin_centers, bins[..., -1:]], -1)
+            bin_lower = torch.cat([bins[..., :1], bin_centers], -1)
+            bins = bin_lower + (bin_upper - bin_lower) * t_rand
+
+        s_near, s_far = ray_bundle.nears, ray_bundle.fars
+        spacing_to_euclidean_fn = lambda x: x * s_far + (1 - x) * s_near
+        euclidean_bins = spacing_to_euclidean_fn(bins)
+        euclidean_bins = map_from_real_distances_to_biased_with_bounds(
+            num_visited_cells.long(), hit_distances, euclidean_bins
+        )
+        bins = (euclidean_bins - s_near) / (s_far - s_near)
+
+        ray_samples = ray_bundle.get_ray_samples(
+            bin_starts=euclidean_bins[..., :-1, None],
+            bin_ends=euclidean_bins[..., 1:, None],
+            spacing_starts=bins[..., :-1, None],
+            spacing_ends=bins[..., 1:, None],
+            spacing_to_euclidean_fn=spacing_to_euclidean_fn,
+        )
+
+        return ray_samples
 
 
 # pylint: disable=attribute-defined-outside-init
@@ -293,7 +381,10 @@ class TetrahedraNerf(Model):
         self.field_output_density = DensityFieldHead(in_dim=self.mlp_base.get_out_dim())
 
         # samplers
-        self.sampler_uniform = UniformSampler(num_samples=self.config.num_samples)
+        if self.config.use_biased_sampler:
+            self.sampler_uniform = TetrahedraSampler(num_samples=self.config.num_samples)
+        else:
+            self.sampler_uniform = UniformSampler(num_samples=self.config.num_samples)
         if self.config.num_fine_samples > 0:
             self.sampler_pdf = PDFSampler(num_samples=self.config.num_fine_samples)
 
@@ -312,6 +403,23 @@ class TetrahedraNerf(Model):
         self.nerfstudio_ssim = structural_similarity_index_measure
         self.lpips = LearnedPerceptualImagePatchSimilarity()
         # self.lpips_vgg = LearnedPerceptualImagePatchSimilarity(net_type="vgg")
+
+    # Just to allow for size reduction of the checkpoint
+    def load_state_dict(self, state_dict, strict: bool = True):
+        for k, v in self.lpips.state_dict().items():
+            state_dict[f"lpips.{k}"] = v
+        for k, v in self.lpips_vgg.state_dict().items():
+            state_dict[f"lpips_vgg.{k}"] = v
+        return super().load_state_dict(state_dict, strict)
+
+    # Just to allow for size reduction of the checkpoint
+    def state_dict(self, *args, **kwargs):
+        state_dict = super().state_dict(*args, **kwargs)
+        for k in self.lpips.state_dict():
+            state_dict.pop(f"lpips.{k}")
+        for k in self.lpips_vgg.state_dict():
+            state_dict.pop(f"lpips_vgg.{k}")
+        return state_dict
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
         param_groups = {}
@@ -350,7 +458,16 @@ class TetrahedraNerf(Model):
         fars_r = fars[ray_mask]
         if nears_r.shape[0] > 0:
             ray_bundle_modified_r = dataclasses.replace(ray_bundle[ray_mask], nears=nears_r, fars=fars_r)
-            ray_samples_r: RaySamples = self.sampler_uniform(ray_bundle_modified_r)
+
+            # Apply biased sampling
+            if isinstance(self.sampler_uniform, TetrahedraSampler):
+                ray_samples_r: RaySamples = self.sampler_uniform(
+                    ray_bundle_modified_r,
+                    num_visited_cells=tracer_output["num_visited_cells"][ray_mask],
+                    hit_distances=tracer_output["hit_distances"][ray_mask],
+                )
+            else:
+                ray_samples_r: RaySamples = self.sampler_uniform(ray_bundle_modified_r)
             distances_r = (ray_samples_r.frustums.ends + ray_samples_r.frustums.starts) / 2
 
             # Trace matched cells and interpolate field

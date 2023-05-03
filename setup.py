@@ -141,5 +141,10 @@ setup(
             "pre-commit>=3.1.1",
         ]
     },
-    entry_points={"nerfstudio.method_configs": ["tetra-nerf = tetranerf.nerfstudio.registration:tetranerf"]},
+    entry_points={
+        "nerfstudio.method_configs": [
+            "tetra-nerf = tetranerf.nerfstudio.registration:tetranerf",
+            "tetra-nerf-original = tetranerf.nerfstudio.registration:tetranerf_original",
+        ]
+    },
 )

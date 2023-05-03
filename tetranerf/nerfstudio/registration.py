@@ -1,3 +1,5 @@
+import dataclasses
+
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManagerConfig
 from nerfstudio.data.dataparsers.minimal_dataparser import MinimalDataParserConfig
 from nerfstudio.engine.optimizers import RAdamOptimizerConfig
@@ -9,8 +11,8 @@ from nerfstudio.plugins.types import MethodSpecification
 from .model import TetrahedraNerf, TetrahedraNerfConfig
 from .pipeline import TetrahedraNerfPipeline
 
-tetranerf_config = TrainerConfig(
-    method_name="tetra-nerf",
+tetranerf_original_config = TrainerConfig(
+    method_name="tetra-nerf-original",
     pipeline=VanillaPipelineConfig(
         _target=TetrahedraNerfPipeline,
         datamanager=VanillaDataManagerConfig(
@@ -37,5 +39,19 @@ tetranerf_config = TrainerConfig(
     },
 )
 
-
-tetranerf = MethodSpecification(config=tetranerf_config, description="Official implementation of Tetra-NeRF paper")
+tetranerf_config = dataclasses.replace(
+    tetranerf_original_config,
+    method_name="tetra-nerf",
+    pipeline=dataclasses.replace(
+        tetranerf_original_config.pipeline,
+        model=dataclasses.replace(
+            tetranerf_original_config.pipeline.model, num_samples=128, num_fine_samples=128, use_biased_sampler=True
+        ),
+    ),
+)
+tetranerf_original = MethodSpecification(
+    config=tetranerf_original_config, description="Official implementation of Tetra-NeRF paper"
+)
+tetranerf = MethodSpecification(
+    config=tetranerf_config, description="Newer version of Tetra-NeRF with better performance"
+)

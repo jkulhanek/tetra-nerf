@@ -6,15 +6,19 @@ Official implementation of **Tetra-NeRF paper**
 *[Jonas Kulhanek](https://jkulhanek.com)<sup>1</sup>, [Torsten Sattler](https://tsattler.github.io/)<sup>1</sup>*<br>
 <sup>1</sup> Czech Technical University in Prague<br>
 
-![method overview](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/overview-white.svg)<br>
+![method overview](https://jkulhanek.com/tetra-nerf/resources/overview-white.svg)<br>
 The input to Tetra-NeRF is a point cloud which is triangulated to get a set of tetrahedra used to represent the radiance field. Rays are sampled, and the field is queried. The barycentric interpolation is used to interpolate tetrahedra vertices, and the resulting features are passed to a shallow MLP to get the density and colours for volumetric rendering.<br>
 
-[![demo blender lego (sparse)](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/blender-lego-sparse-100k-animated-cover.gif)](https://jkulhanek.com/tetra-nerf/demo.html?scene=blender-lego-sparse)
-[![demo mipnerf360 garden (sparse)](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-garden-sparse-100k-animated-cover.gif)](https://jkulhanek.com/tetra-nerf/demo.html?scene=360-garden-sparse)
-[![demo mipnerf360 garden (sparse)](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-bonsai-sparse-100k-animated-cover.gif)](https://jkulhanek.com/tetra-nerf/demo.html?scene=360-bonsai-sparse)
-[![demo mipnerf360 kitchen (dense)](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/resources/images/360-kitchen-dense-300k-animated-cover.gif)](https://jkulhanek.com/tetra-nerf/demo.html?scene=360-kitchen-dense)
+[![demo blender lego (sparse)](https://jkulhanek.com/tetra-nerf/resources/images/blender-lego-sparse-100k-animated-cover.gif)](https://jkulhanek.com/tetra-nerf/demo.html?scene=blender-lego-sparse)
+[![demo mipnerf360 garden (sparse)](https://jkulhanek.com/tetra-nerf/resources/images/360-garden-sparse-100k-animated-cover.gif)](https://jkulhanek.com/tetra-nerf/demo.html?scene=360-garden-sparse)
+[![demo mipnerf360 garden (sparse)](https://jkulhanek.com/tetra-nerf/resources/images/360-bonsai-sparse-100k-animated-cover.gif)](https://jkulhanek.com/tetra-nerf/demo.html?scene=360-bonsai-sparse)
+[![demo mipnerf360 kitchen (dense)](https://jkulhanek.com/tetra-nerf/resources/images/360-kitchen-dense-300k-animated-cover.gif)](https://jkulhanek.com/tetra-nerf/demo.html?scene=360-kitchen-dense)
 
 <br>
+
+**UPDATE!**
+Tetra-NeRF is now faster and achieves better performance thanks to using biased sampling instead of sampling uniformly along the ray.
+The configuration from the paper was renamed to `tetra-nerf-original`. And `tetra-nerf` now points to the new configuration.
 
 ## Introduction
 First, install **Tetra-NeRF**. The instructions are given in the [installation](#installation) section.
@@ -101,15 +105,15 @@ python -m tetranerf.scripts.triangulate --pointcloud data/mipnerf360/<scene>/den
 To run the training, use the following commands:
 - For **Blender dataset**, run the following:
 ```bash
-ns-train tetra-nerf --pipeline.model.tetrahedra-path data/blender/<scene>/pointnerf-0.5.th blender-data --data data/blender/<scene>
+ns-train tetra-nerf-original --pipeline.model.tetrahedra-path data/blender/<scene>/pointnerf-0.5.th blender-data --data data/blender/<scene>
 ```
 - For **Tanks and Temples dataset**, run the following:
 ```bash
-ns-train tetra-nerf --pipeline.model.tetrahedra-path data/nsvf-tanks-and-temples/<scene>/dense-1M.th minimal-parser --data data/nsvf-tanks-and-temples/<scene>
+ns-train tetra-nerf-original --pipeline.model.tetrahedra-path data/nsvf-tanks-and-temples/<scene>/dense-1M.th minimal-parser --data data/nsvf-tanks-and-temples/<scene>
 ```
 - For **Mip-NeRF 360 dataset**, run the following:
 ```bash
-ns-train tetra-nerf --pipeline.model.tetrahedra-path data/mipnerf360/<scene>/dense-1M.th minimal-parser --data data/mipnerf360/<scene>
+ns-train tetra-nerf-original --pipeline.model.tetrahedra-path data/mipnerf360/<scene>/dense-1M.th minimal-parser --data data/mipnerf360/<scene>
 ```
 
 ## Installation

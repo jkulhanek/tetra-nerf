@@ -246,7 +246,7 @@ def test_tetrahedra_interpolate_values(tetrahedra):
 
     # Interpolation forward
     num_vertices = len(tetrahedra["vertices"])
-    field = torch.empty((num_vertices, 64), dtype=torch.float32, device=device).random_()
+    field = torch.empty((64, num_vertices), dtype=torch.float32, device=device).random_()
     ellapsed = 0
     for i in range(20):
         start = time.time()
@@ -262,8 +262,8 @@ def test_tetrahedra_interpolate_values(tetrahedra):
             print("fingerprint: ", val.sum())
             # test
             gt = torch.einsum(
-                "rbij,rbi->rj",
-                field[inter_out["vertex_indices"].long()],
+                "jrbi,rbi->rj",
+                field[:, inter_out["vertex_indices"].long()],
                 inter_out["barycentric_coordinates"],
             )
             torch.testing.assert_allclose(val.sum(1), gt)
@@ -287,7 +287,7 @@ def test_tetrahedra_interpolate_values(tetrahedra):
         grad = field.grad
         end = time.time()
         ellapsed += end - start
-        assert grad.shape == (num_vertices, 64)
+        assert grad.shape == (64, num_vertices)
         if i == 0:
             pass
             # print("fingerprint: ", val.sum())
@@ -295,8 +295,8 @@ def test_tetrahedra_interpolate_values(tetrahedra):
             field2 = field.detach().clone()
             field2.requires_grad_(True)
             gt = torch.einsum(
-                "rbij,rbi->rj",
-                field2[inter_out["vertex_indices"].long()],
+                "jrbi,rbi->rj",
+                field2[:, inter_out["vertex_indices"].long()],
                 inter_out["barycentric_coordinates"],
             )
             assert gt.requires_grad
