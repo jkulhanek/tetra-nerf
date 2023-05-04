@@ -227,25 +227,6 @@ class TetrahedraNerf(Model):
         )
         self._tetrahedra_initialized = False
 
-    # Just to allow for size reduction of the checkpoint
-    def load_state_dict(self, state_dict, strict: bool = True):
-        for k, v in self.lpips.state_dict().items():
-            state_dict[f"lpips.{k}"] = v
-        if hasattr(self, "lpips_vgg"):
-            for k, v in self.lpips_vgg.state_dict().items():
-                state_dict[f"lpips_vgg.{k}"] = v
-        return super().load_state_dict(state_dict, strict)
-
-    # Just to allow for size reduction of the checkpoint
-    def state_dict(self, *args, **kwargs):
-        state_dict = super().state_dict(*args, **kwargs)
-        for k in self.lpips.state_dict():
-            state_dict.pop(f"lpips.{k}")
-        if hasattr(self, "lpips_vgg"):
-            for k in self.lpips_vgg.state_dict():
-                state_dict.pop(f"lpips_vgg.{k}")
-        return state_dict
-
     @staticmethod
     def _init_tetrahedra_field(tetrahedra_field):
         scale = 1e-4
@@ -408,17 +389,17 @@ class TetrahedraNerf(Model):
     def load_state_dict(self, state_dict, strict: bool = True):
         for k, v in self.lpips.state_dict().items():
             state_dict[f"lpips.{k}"] = v
-        for k, v in self.lpips_vgg.state_dict().items():
-            state_dict[f"lpips_vgg.{k}"] = v
+        if hasattr(self, "lpips_vgg"):
+            for k, v in self.lpips_vgg.state_dict().items():
+                state_dict[f"lpips_vgg.{k}"] = v
         return super().load_state_dict(state_dict, strict)
 
     # Just to allow for size reduction of the checkpoint
-    def state_dict(self, *args, **kwargs):
-        state_dict = super().state_dict(*args, **kwargs)
-        for k in self.lpips.state_dict():
-            state_dict.pop(f"lpips.{k}")
-        for k in self.lpips_vgg.state_dict():
-            state_dict.pop(f"lpips_vgg.{k}")
+    def state_dict(self, *args, prefix="", **kwargs):
+        state_dict = super().state_dict(*args, prefix=prefix, **kwargs)
+        for k in list(state_dict.keys()):
+            if k.startswith(f"{prefix}lpips.") or k.startswith(f"{prefix}lpips_vgg."):
+                state_dict.pop(k)
         return state_dict
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
