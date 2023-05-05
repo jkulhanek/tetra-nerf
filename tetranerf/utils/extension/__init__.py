@@ -5,17 +5,21 @@ import torch
 
 try:
     from . import tetranerf_cpp_extension as cpp
-except ImportError:
-    # TODO: Raise error
+except ImportError as e:
     print("\033[91;1mERROR: Tetra-NeRF could not load the cpp extension. Build the project first.\033[0m")
+    import_exception = e
 
     class LazyError:
         class LazyErrorObj:
             def __call__(self, *args, **kwds):
-                raise RuntimeError("ERROR: Tetra-NeRF could not load cpp extension. Please build the project first")
+                raise RuntimeError(
+                    "ERROR: Tetra-NeRF could not load cpp extension. Please build the project first"
+                ) from import_exception
 
             def __getattribute__(self, __name: str):
-                raise RuntimeError("ERROR: Tetra-NeRF could not load cpp extension. Please build the project first")
+                raise RuntimeError(
+                    "ERROR: Tetra-NeRF could not load cpp extension. Please build the project first"
+                ) from import_exception
 
         def __getattribute__(self, __name: str):
             return LazyError.LazyErrorObj()
