@@ -1,5 +1,5 @@
 # NOTE: The OptiX library has to be downloaded separatedly due to licensing.
-#       Please download the OptiX library from https://developer.nvidia.com/designworks/optix/download
+#       Please download the OptiX library (>=7.2, <=7.6) from https://developer.nvidia.com/designworks/optix/downloads/legacy
 #       Due to the OptiX library residing outside the build context, Dockerfile requires docker buildx
 #       to build the image. Please refer to https://docs.docker.com/buildx/working-with-buildx/ 
 #       for more information.  

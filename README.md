@@ -122,7 +122,7 @@ First, make sure to install the following:
 CUDA (>=11.3)
 PyTorch (>=1.12.1)
 Nerfstudio (>=0.2.0)
-OptiX (>=7.2, preferably 7.6)
+OptiX (>=7.2,<=7.6, preferably 7.6)
 CGAL
 CMake (>=3.22.1)
 ```
@@ -135,7 +135,7 @@ python -c 'import torch; import torch.utils.cpp_extension;arch=(";".join(sorted(
 ```
 which will output your CUDA version and CUDA compute, which should be greater than 61 and ideally 86.
 
-The OptiX library can be installed from here [https://developer.nvidia.com/designworks/optix/download](https://developer.nvidia.com/designworks/optix/download). If you install it to a non-standard path, set the environment variable `OPTIX_PATH=/path/to/optix` when building `Tetra-NeRF`.
+The OptiX library can be installed from here [https://developer.nvidia.com/designworks/optix/downloads/legacy](https://developer.nvidia.com/designworks/optix/downloads/legacy). If you install it to a non-standard path, set the environment variable `OPTIX_PATH=/path/to/optix` when building `Tetra-NeRF`.
 
 Finally, you can install **Tetra-NeRF** by running:
 ```
