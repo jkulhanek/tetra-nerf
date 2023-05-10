@@ -26,9 +26,9 @@ RUN if [ ! -e /opt/optix/include/optix.h ]; then echo "Could not find the OptiX 
 
 RUN export PIP_ROOT_USER_ACTION=ignore && \
     pip install --upgrade pip && \
+    pip install nerfstudio==0.2.2 trimesh==3.21.5 dm-pix==0.4.0  && \
     pip uninstall -y functorch && \
-    pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html && \
-    pip install nerfstudio==0.2.0 trimesh==3.21.5 dm-pix==0.4.0  && \
+    pip install --upgrade "jax[cuda11_cudnn82]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html && \
     pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117 && \
     pip cache purge
 
