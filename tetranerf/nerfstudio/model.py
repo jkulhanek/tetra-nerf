@@ -84,6 +84,8 @@ class TetrahedraNerfConfig(ModelConfig):
     input_fourier_frequencies: int = 0
 
     initialize_colors: bool = True
+    use_gradient_scaling: bool = False
+    """Use gradient scaler where the gradients are lower for points closer to the camera."""
 
     def __post_init__(self):
         if self.tetrahedra_path is not None and self.num_tetrahedra_vertices is None:
@@ -179,6 +181,19 @@ class TetrahedraSampler(Sampler):
         )
 
         return ray_samples
+
+
+class GradientScaler(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, colors, sigmas, ray_dist):
+        ctx.save_for_backward(ray_dist)
+        return colors, sigmas, ray_dist
+
+    @staticmethod
+    def backward(ctx, grad_output_colors, grad_output_sigmas, grad_output_ray_dist):
+        (ray_dist,) = ctx.saved_tensors
+        scaling = torch.square(ray_dist).clamp(0, 1)
+        return grad_output_colors * scaling, grad_output_sigmas * scaling, grad_output_ray_dist
 
 
 # pylint: disable=attribute-defined-outside-init
@@ -501,9 +516,18 @@ class TetrahedraNerf(Model):
             mlp_out = self.mlp_head(torch.cat([encoded_dir, base_mlp_out], dim=-1))  # type: ignore
             field_outputs[self.field_output_color.field_head_name] = self.field_output_color(mlp_out)
 
-            weights = ray_samples_r.get_weights(field_outputs[FieldHeadNames.DENSITY])
+            colors = field_outputs[FieldHeadNames.RGB]
+            sigmas = field_outputs[FieldHeadNames.DENSITY]
+            if self.config.use_gradient_scaling:
+                # NOTE: we multiply the ray distance by 2 because according to the
+                # Radiance Field Gradient Scaling for Unbiased Near-Camera Training
+                # paper, it is the distance to the object center
+                ray_dist = ray_samples_r.spacing_ends + ray_samples_r.spacing_starts
+                colors, sigmas, ray_dist = GradientScaler.apply(colors, sigmas, ray_dist)
+
+            weights = ray_samples_r.get_weights(sigmas)
             rgb_r = self.renderer_rgb(
-                rgb=field_outputs[FieldHeadNames.RGB],
+                rgb=colors,
                 weights=weights,
             )
             accumulation_r = self.renderer_accumulation(weights)

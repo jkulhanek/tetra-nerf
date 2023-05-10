@@ -45,7 +45,11 @@ tetranerf_config = dataclasses.replace(
     pipeline=dataclasses.replace(
         tetranerf_original_config.pipeline,
         model=dataclasses.replace(
-            tetranerf_original_config.pipeline.model, num_samples=128, num_fine_samples=128, use_biased_sampler=True
+            tetranerf_original_config.pipeline.model,
+            num_samples=128,
+            num_fine_samples=128,
+            use_biased_sampler=True,
+            use_gradient_scaling=True,
         ),
     ),
 )
