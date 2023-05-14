@@ -6,7 +6,7 @@
 # The following command builds the image:
 #     `docker build -t tetra-nerf:latest --build-context optix=/opt/optix
 # The image can be run with the following command:
-#     `docker run -it -e  NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility --gpus all tetra-nerf:latest`
+#     `docker run -it --gpus all tetra-nerf:latest`
 FROM nvidia/cuda:11.7.1-devel-ubuntu22.04
 COPY --from=optix . /opt/optix
 RUN if [ ! -e /opt/optix/include/optix.h ]; then echo "Could not find the OptiX library. Please install the Optix SDK and add the following argument to the buildx command: --build-context optix=/path/to/the/SDK"; exit 1; fi && \
@@ -42,8 +42,11 @@ RUN pip install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=binding
 LABEL org.opencontainers.image.authors="jonas.kulhanek@live.com"
 ENV PATH="/home/user/.local/bin:${PATH}"
 RUN adduser --disabled-password user --gecos "First Last,RoomNumber,WorkPhone,HomePhone"
-USER user
 
 WORKDIR /home/user
 COPY --chown=user . /home/user/tetra-nerf
 RUN pip install -e tetra-nerf
+
+# Remove /opt/optix due to its license
+# RUN rm -rf /opt/optix
+USER user

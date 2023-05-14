@@ -143,7 +143,14 @@ pip install git+https://github.com/jkulhanek/tetra-nerf
 ```
 
 ### Docker
-Alternatively, you can also build and run the `tetra-nerf` in a docker container. Use the `Dockerfile` file to build the image.
+Alternatively, you can also run **Tetra-NeRF** in a docker image:
+```
+docker pull kulhanek/tetra-nerf:latest
+docker run --rm -it --gpus all -p 7007:7007 kulhanek/tetra-nerf:latest
+```
+Note, it is required that `nvidia-container-toolkit` is installed and configured properly.
+
+You can also build your custom image. Follow the instructions in the attached `Dockerfile`.
 
 ## Checkpoints and predictions
 To enable easier comparisons with our method we further provide pretrained checkpoints for all scenes on all evaluated datasets.
