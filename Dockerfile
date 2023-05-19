@@ -14,15 +14,48 @@ RUN if [ ! -e /opt/optix/include/optix.h ]; then echo "Could not find the OptiX 
     ca-certificates \
     cmake \
     git \
-    colmap \
     ffmpeg \
     python3 \
     python3-pip \
     python3-dev \
     python-is-python3 \
     libcgal-dev \
+    ninja-build \
+    build-essential \
+    libboost-program-options-dev \
+    libboost-filesystem-dev \
+    libboost-graph-dev \
+    libboost-system-dev \
+    libboost-test-dev \
+    libeigen3-dev \
+    libflann-dev \
+    libfreeimage-dev \
+    libmetis-dev \
+    libgoogle-glog-dev \
+    libgflags-dev \
+    libsqlite3-dev \
+    libglew-dev \
+    qtbase5-dev \
+    libqt5opengl5-dev \
+    libceres-dev \
     && \
     rm -rf /var/lib/apt/lists/*
+
+ARG CUDAARCHS=61;70;75;80;86
+ENV CUDAARCHS=${CUDAARCHS} \
+    TCNN_CUDA_ARCHITECTURES=${CUDAARCHS} \
+    NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility \
+    CMAKE_CUDA_ARCHITECTURES=${CUDAARCHS}
+
+RUN cd /opt && \
+    git clone https://github.com/colmap/colmap.git && \
+    cd colmap && \
+    git checkout dev && \
+    mkdir build && \
+    cd build && \
+    cmake .. -GNinja && \
+    ninja && \
+    ninja install
 
 RUN export PIP_ROOT_USER_ACTION=ignore && \
     pip install --upgrade pip && \
@@ -32,10 +65,6 @@ RUN export PIP_ROOT_USER_ACTION=ignore && \
     pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117 && \
     pip cache purge
 
-ARG CUDAARCHS=61;70;75;80;86
-ENV CUDAARCHS=${CUDAARCHS} \
-    TCNN_CUDA_ARCHITECTURES=${CUDAARCHS} \
-    NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility
 # Basically just to remove the NerfStudio warning
 RUN pip install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 
