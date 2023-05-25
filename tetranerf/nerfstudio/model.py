@@ -4,6 +4,7 @@ import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+import os
 
 import nerfstudio.utils
 import torch
@@ -38,6 +39,7 @@ from ..utils.extension import TetrahedraTracer, interpolate_values
 CONSOLE = Console(width=120)
 
 try:
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     import dm_pix as pix
     import jax
 

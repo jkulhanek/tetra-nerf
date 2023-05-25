@@ -7,7 +7,7 @@
 #     `docker build -t tetra-nerf:latest --build-context optix=/opt/optix
 # The image can be run with the following command:
 #     `docker run -it --gpus all tetra-nerf:latest`
-FROM dromni/nerfstudio:0.3.1
+FROM dromni/nerfstudio:0.2.2
 COPY --from=optix . /opt/optix
 RUN if [ ! -e /opt/optix/include/optix.h ]; then echo "Could not find the OptiX library. Please install the Optix SDK and add the following argument to the buildx command: --build-context optix=/path/to/the/SDK"; exit 1; fi
 
@@ -15,10 +15,11 @@ ARG CUDAARCHS=61;70;75;80;86
 ENV CUDAARCHS=${CUDAARCHS} \
     TCNN_CUDA_ARCHITECTURES=${CUDAARCHS} \
     NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility \
-    CMAKE_CUDA_ARCHITECTURES=${CUDAARCHS}
+    CMAKE_CUDA_ARCHITECTURES=${CUDAARCHS} \
+    XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 RUN export PIP_ROOT_USER_ACTION=ignore && \
-    python3.10 -m pip install --upgrade "jax[cuda11_cudnn82]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html && \
+    python3.10 -m pip install --upgrade "jax[cuda11_cudnn82]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html dm_pix && \
     python3.10 -m pip cache purge
 
 LABEL org.opencontainers.image.authors="jonas.kulhanek@live.com"
