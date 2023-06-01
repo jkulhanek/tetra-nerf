@@ -156,6 +156,8 @@ You can also build your custom image. Follow the instructions in the attached `D
 To enable easier comparisons with our method we further provide pretrained checkpoints for all scenes on all evaluated datasets.
 We also publish the predicted images for the test sets.
 
+NOTE: Checkpoints require `nerfstudio<0.3.0` version to be installed.
+
 | Dataset  | Checkpoints | Predictions | Input tetrahedra |
 | -------- | ----------- | ----------- | ---------------- |
 | Mip-NeRF 360 (public scenes) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-checkpoints.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-tetrahedra.tar.gz) |
