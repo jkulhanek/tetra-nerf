@@ -37,7 +37,7 @@ jobs:
         run: |
           echo "Pulling the following resources:"
           export regex='https:\/\/data\.ciirc\.cvut\.cz\/public\/projects\/([^\/]+)\/([^\"\, ]+)\/([^\"\,\/ ]+)'
-          grep -r --include "*.html" --exclude "demo.html" -oh -P "$regex" docs | xargs -I{} bash -c '[[ "{}" =~ $regex ]] && path="${BASH_REMATCH[2]}/${BASH_REMATCH[3]}" && echo "{} -> $path" && mkdir -p "docs/${BASH_REMATCH[2]}" && if [ ! -e "docs/$path" ]; then wget --no-verbose "{}" -O "docs/$path"; fi'
+          grep -r --include "*.html" --exclude "demo.html" -oh -P "$regex" docs | xargs -I{} bash -c '[[ "{}" =~ $regex ]] && path="${BASH_REMATCH[2]}/${BASH_REMATCH[3]}" && echo "{} -> $path" && mkdir -p "docs/${BASH_REMATCH[2]}" && if [ ! -e "docs/$path" ]; then wget --no-check-certificate --no-verbose "{}" -O "docs/$path"; fi'
           find docs -name '*.html' ! -name 'demo.html' | xargs sed -r -i "s#$regex#./\2/\3#g"
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
