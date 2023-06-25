@@ -1,4 +1,5 @@
 import typing
+from torch.cuda.amp.grad_scaler import GradScaler
 
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManager
 from nerfstudio.pipelines.base_pipeline import (
@@ -20,6 +21,7 @@ class TetrahedraNerfPipeline(VanillaPipeline):
         test_mode: Literal["test", "val", "inference"] = "val",
         world_size: int = 1,
         local_rank: int = 0,
+        grad_scaler: typing.Optional[GradScaler] = None,
     ):
         Pipeline.__init__(self)
         self.config = config
@@ -34,12 +36,16 @@ class TetrahedraNerfPipeline(VanillaPipeline):
         assert self.datamanager.train_dataset is not None, "Missing input dataset"
 
         # Loaded pointcloud must be transformed using the transform from the Dataparser
+        kwargs = {}  # Compatible with NerfStudio<0.3.0, where the parameter did not exist
+        if grad_scaler is not None:
+            kwargs["grad_scaler"] = grad_scaler
         self._model = config.model.setup(
             scene_box=self.datamanager.train_dataset.scene_box,
             dataparser_transform=self.datamanager.train_dataparser_outputs.dataparser_transform,
             dataparser_scale=self.datamanager.train_dataparser_outputs.dataparser_scale,
             num_train_data=len(self.datamanager.train_dataset),
             metadata=self.datamanager.train_dataset.metadata,
+            **kwargs,
         )
         self.model.to(device)
 
