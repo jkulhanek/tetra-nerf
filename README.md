@@ -23,8 +23,7 @@ The configuration from the paper was renamed to `tetra-nerf-original`. And `tetr
 ## Introduction
 First, install **Tetra-NeRF**. The instructions are given in the [installation](#installation) section.
 If you want to reproduce the results from the paper, please follow the [reproducing results section](#reproducing-results) which
-will instruct you on how to download the data and run the training. We also publish the trained checkpoints
-and the generated images.
+will instruct you on how to download the data and run the training. We also publish the generated images.
 
 If you want to use **Tetra-NeRF** with your own collected data, please follow the [using custom data section](#using-custom-data).
 
@@ -71,7 +70,7 @@ You can then follow the instructions in the [without existing colmap model secti
 
 ## Reproducing results
 We first give instructions on how to download and preprocess the data, and run the training.
-We also publish the trained checkpoints and generated images.
+We also publish the generated images.
 
 ### Getting the data
 First, please download and extract the datasets.
@@ -152,17 +151,14 @@ Note, it is required that `nvidia-container-toolkit` is installed and configured
 
 You can also build your custom image. Follow the instructions in the attached `Dockerfile`.
 
-## Checkpoints and predictions
-To enable easier comparisons with our method we further provide pretrained checkpoints for all scenes on all evaluated datasets.
-We also publish the predicted images for the test sets.
+## Predictions
+To enable easier comparisons with our method we further provide the predicted images for the test sets.
 
-NOTE: Checkpoints require `nerfstudio<0.3.0` version to be installed.
-
-| Dataset  | Checkpoints | Predictions | Input tetrahedra |
-| -------- | ----------- | ----------- | ---------------- |
-| Mip-NeRF 360 (public scenes) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-checkpoints.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-tetrahedra.tar.gz) |
-| Blender | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/blender-checkpoints.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/blender-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/blender-tetrahedra.tar.gz) |
-| Tanks and Temples | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/nsvf-tanks-and-temples-checkpoints.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/nsvf-tanks-and-temples-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/nsvf-tanks-and-temples-tetrahedra.tar.gz) |
+| Dataset                        | Predictions | Input tetrahedra |
+| ------------------------------ | ----------- | ---------------- |
+| Mip-NeRF 360 (public scenes)   | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/mipnerf360-public-tetrahedra.tar.gz) |
+| Blender                        | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/blender-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/blender-tetrahedra.tar.gz) |
+| Tanks and Temples              | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/nsvf-tanks-and-temples-predictions.tar.gz) | [download](https://data.ciirc.cvut.cz/public/projects/2023TetraNeRF/assets/nsvf-tanks-and-temples-tetrahedra.tar.gz) |
 
 
 ## Thanks

@@ -222,10 +222,10 @@ __global__ void find_matched_cells_kernel(const size_t num_rays,
                 const float4 coords1 = barycentric_coordinates[(i * max_visited_cells + current_cell_pointer) * 2];
                 const float4 coords2 = barycentric_coordinates[(i * max_visited_cells + current_cell_pointer) * 2 + 1];
                 barycentric_coordinates_out[i * num_samples_per_ray + j] = make_float4(
-                    mult * coords1.x + (1 - mult) * coords2.x,
-                    mult * coords1.y + (1 - mult) * coords2.y,
-                    mult * coords1.z + (1 - mult) * coords2.z,
-                    mult * coords1.w + (1 - mult) * coords2.w);
+                    (1-mult) * coords1.x + mult * coords2.x,
+                    (1-mult) * coords1.y + mult * coords2.y,
+                    (1-mult) * coords1.z + mult * coords2.z,
+                    (1-mult) * coords1.w + mult * coords2.w);
             }
             // Else there is no match - space between two cells
         }
