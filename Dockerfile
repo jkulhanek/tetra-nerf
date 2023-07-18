@@ -19,7 +19,7 @@ ENV CUDAARCHS=${CUDAARCHS} \
     XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 RUN export PIP_ROOT_USER_ACTION=ignore && \
-    python3.10 -m pip install --upgrade "jax[cuda11_cudnn82]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html dm_pix && \
+    python3.10 -m pip install --upgrade "jax[cpu]" dm_pix && \
     python3.10 -m pip cache purge
 
 LABEL org.opencontainers.image.authors="jonas.kulhanek@live.com"
