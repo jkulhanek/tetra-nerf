@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Literal
 import os
 
 import nerfstudio.utils
@@ -24,6 +24,7 @@ from nerfstudio.model_components.renderers import (
     DepthRenderer,
     RGBRenderer,
 )
+from nerfstudio.utils import colors
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.utils import colormaps, misc
 from rich.console import Console
@@ -40,6 +41,7 @@ CONSOLE = Console(width=120)
 
 try:
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+    os.environ["JAX_PLATFORM_NAME"] = "cpu"
     import dm_pix as pix
     import jax
 
@@ -86,8 +88,11 @@ class TetrahedraNerfConfig(ModelConfig):
     input_fourier_frequencies: int = 0
 
     initialize_colors: bool = True
+
     use_gradient_scaling: bool = False
     """Use gradient scaler where the gradients are lower for points closer to the camera."""
+
+    background_color: Literal["random", "last_sample", "black", "white"] = "white"
 
     def __post_init__(self):
         if self.tetrahedra_path is not None and self.num_tetrahedra_vertices is None:
@@ -387,8 +392,7 @@ class TetrahedraNerf(Model):
             self.sampler_pdf = PDFSampler(num_samples=self.config.num_fine_samples)
 
         # renderers
-        self._background_color = nerfstudio.utils.colors.WHITE
-        self.renderer_rgb = RGBRenderer(background_color=self._background_color)
+        self.renderer_rgb = RGBRenderer(background_color=self.config.background_color)
         self.renderer_accumulation = AccumulationRenderer()
         self.renderer_depth = DepthRenderer()
 
@@ -426,11 +430,19 @@ class TetrahedraNerf(Model):
         param_groups["fields"] = list(self.parameters())
         return param_groups
 
-    def get_background_color(self):
-        background_color = self._background_color
+    def get_background_color(self, shape, device):
+        # TODO: new NS version can return this from the renderer
+        background_color = self.config.background_color
         if renderers.BACKGROUND_COLOR_OVERRIDE is not None:
             background_color = renderers.BACKGROUND_COLOR_OVERRIDE
-        return background_color
+        if background_color == "random":
+            return torch.rand(shape, dtype=torch.float32, device=device)
+        if isinstance(background_color, str) and background_color in colors.COLORS_DICT:
+            background_color = colors.COLORS_DICT[background_color]
+        assert isinstance(background_color, torch.Tensor)
+
+        # Ensure correct shape
+        return background_color.expand(shape).to(device).contiguous()
 
     def get_outputs(self, ray_bundle: RayBundle):
         if self.mlp_base is None:
@@ -537,12 +549,7 @@ class TetrahedraNerf(Model):
 
         # Expand rendered values back to the original shape
         device = ray_mask.device
-        rgb = (
-            self.get_background_color()
-            .to(device=device, dtype=torch.float32)
-            .view(1, 3)
-            .repeat_interleave(ray_mask.shape[0], 0)
-        )
+        rgb = self.get_background_color((ray_mask.shape[0], 3), device=device)
         # rgb = torch.zeros((ray_mask.shape[0], 3), dtype=torch.float32, device=device)
         accumulation = torch.zeros((ray_mask.shape[0], 1), dtype=torch.float32, device=device)
         depth = torch.full(
