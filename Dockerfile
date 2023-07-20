@@ -27,8 +27,10 @@ LABEL org.opencontainers.image.authors="jonas.kulhanek@live.com"
 COPY --chown=1000 . /home/user/tetra-nerf
 
 USER 1000
-RUN python3.10 -m pip install -e /home/user/tetra-nerf && \
-    ns-install-cli --mode install || echo "Skipping ns-cli-install, user nvidia runtime to run it"
+RUN path="$PWD" && cd /home/user/tetra-nerf && \
+    python3.10 -m pip install -e . && \
+    cd "$path" && \
+    (ns-install-cli --mode install || echo "Skipping ns-cli-install, user nvidia runtime to run it")
     # Install cli for users who use nvidia runtime during build
 
 # Remove /opt/optix due to its license
