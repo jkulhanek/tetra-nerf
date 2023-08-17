@@ -142,6 +142,9 @@ h1 .title-small  {
 .video.d16x9::before {
   padding-bottom: 56.25%;
 }
+.video.d1112x720::before {
+  padding-bottom: 64.748%;
+}
 
 .video video,
 .video iframe{
