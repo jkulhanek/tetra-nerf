@@ -131,16 +131,6 @@ setup(
     zip_safe=False,
     python_requires=">=3.7",
     install_requires=["trimesh>=3.20.2", "nerfstudio>=0.2.0"],
-    extras_require={
-        "dev": [
-            "black[jupyter]==22.3.0",
-            "pylint==2.13.4",
-            "pytest==7.1.2",
-            "pytest-xdist==2.5.0",
-            "typeguard==2.13.3",
-            "pre-commit>=3.1.1",
-        ]
-    },
     entry_points={
         "nerfstudio.method_configs": [
             "tetra-nerf = tetranerf.nerfstudio.registration:tetranerf",

@@ -1,4 +1,6 @@
 #include <assert.h>
+
+#include <iostream>
 #include <limits>
 
 #include "tetrahedra_tracer.h"
@@ -15,169 +17,99 @@ __global__ void cu_convert_cells_to_vertices(int n, const uint4 *cells, uint3 *v
     }
 }
 
-void convert_cells_to_vertices(const size_t block_size, const size_t n, const uint4 *cells, uint3 *triangle_indices) {
+void convert_cells_to_vertices(const size_t n, const uint4 *cells, uint3 *triangle_indices) {
+    const size_t block_size = 1024;
     cu_convert_cells_to_vertices<<<(n + block_size - 1) / block_size, block_size>>>(n, cells, triangle_indices);
 }
 
 template <typename T>
-__forceinline__ __device__ void swap(T &first, T &second) {
-    const T mid = first;
-    first = second;
-    second = mid;
+__host__ __device__ T div_round_up(T val, T divisor) {
+    return (val + divisor - 1) / divisor;
 }
 
-__forceinline__ __device__ float4 get_tetrahedra_barycentric_coordinates(const float2 triangle_coords, const unsigned int face) {
-    assert(face < 4);
-    const float b = triangle_coords.x;
-    const float c = triangle_coords.y;
-    const float a = 1.0f - b - c;
-    if (face == 0) {
-        return make_float4(0, a, b, c);
-    } else if (face == 1) {
-        return make_float4(c, 0, a, b);
-    } else if (face == 2) {
-        return make_float4(b, c, 0, a);
-    } else if (face == 3) {
-        return make_float4(a, b, c, 0);
-    }
-    return make_float4(0, 0, 0, 0);
+template <typename float_type>
+__global__ void gather_uint32_kernel(const uint32_t num_values,
+                                     const uint32_t num_indices,
+                                     const uint32_t *indices,
+                                     const float_type *values,
+                                     float_type *result) {
+    const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_indices) return;
+
+    const auto target_ind = indices[i];
+    if (target_ind >= num_values) return;
+    result[i] = values[target_ind];
 }
 
-__global__ void post_process_tetrahedra_kernel(const size_t num_rays,
-                                               const size_t max_visited_triangles,
-                                               const size_t max_visited_cells,
-                                               const unsigned int *num_visited_triangles,
-                                               unsigned int *visited_triangles,
-                                               const float2 *barycentric_coordinates_triangle,
-                                               const float *distances,
-                                               unsigned int *visited_cells,
-                                               unsigned int *num_visited_cells,
-                                               float4 *barycentric_coordinates,
-                                               float *cell_distances,
-                                               float eps) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    for (size_t i = index; i < num_rays; i += stride) {
-        const unsigned int ray_len = num_visited_triangles[i];
-        size_t jc = 0;  // Local index to next cell to write
-
-        // Dedupe triangles
-        // TODO: do this more efficiently!!
-        auto t = visited_triangles + (i * max_visited_triangles);
-        const auto dl = distances + (i * max_visited_triangles);
-        const auto empty = std::numeric_limits<unsigned int>::max();
-        for (size_t j = 0; j + 1 < ray_len; ++j) {
-            if (t[j] == empty) {
-                continue;
-            }
-            float dn = dl[j];
-            bool clear_self = false;
-            for (size_t offset = 1; j + offset < ray_len && (t[j + offset] == empty || abs(dl[j + offset] - dn) < eps); offset++) {
-                if (t[j + offset] != empty && t[j] / 4 == t[j + offset] / 4) {
-                    // Triangle registered two times
-                    // We only count it once, there can be exitting face later on
-                    if (t[j] != t[j + offset]) {
-                        // This is the case where the tetrahedra was hitted twice
-                        // But the length of the intersection is too small to register
-                        // We ignore the cell altogether
-                        clear_self = true;
-                    }
-                    t[j + offset] = empty;
-                }
-            }
-            if (clear_self) {
-                t[j] = empty;
-            }
-        }
-
-        for (size_t j = 0; j < ray_len; ++j) {
-            if (t[j] == empty) {
-                continue;
-            }
-
-            const auto cell = t[j] / 4;
-            auto dn = dl[j];
-            size_t real_offset = 1;
-            bool was_error = true;
-            for (size_t offset = 1;
-                 j + offset < ray_len && (real_offset < 3 || t[j + offset] == empty || abs(dl[j + offset] - dn) < eps);
-                 offset++) {
-                if (t[j + offset] == empty) {
-                    continue;
-                }
-
-                if (t[j + offset] / 4 == cell) {
-                    // Close face - dump to output
-                    const auto jc_g = i * max_visited_cells + jc;
-                    visited_cells[jc_g] = t[j] / 4;
-                    barycentric_coordinates[jc_g * 2] = get_tetrahedra_barycentric_coordinates(
-                        barycentric_coordinates_triangle[i * max_visited_triangles + j],
-                        t[j] % 4);
-                    barycentric_coordinates[jc_g * 2 + 1] = get_tetrahedra_barycentric_coordinates(
-                        barycentric_coordinates_triangle[i * max_visited_triangles + j + offset],
-                        t[j + offset] % 4);
-                    cell_distances[jc_g * 2] = dl[j];
-                    cell_distances[jc_g * 2 + 1] = dl[j + offset];
-                    jc++;
-
-                    // If the closing triangle is the next one, move pointer, otherwise, mask the triangle to skip it during traversal
-                    // Rotate next faces to
-                    if (offset == 1) {
-                        j += 1;
-                    } else {
-                        t[j + offset] = empty;
-                    }
-                    was_error = false;
-                    break;
-                }
-                dn = dl[j + offset];
-                real_offset++;
-            }
-
-            if (was_error && real_offset > 1) {
-                // If real offest == 1, this is the last triangle on the ray
-                // The ray might have been terminated prematurely because
-                // the max_visited_triangles wasn't large enough
-                // Therefore, this should not be considered an error.
-                // if (i == 97810) {
-                // printf("error on ray: %d\n", i);
-                // for (size_t j = 0; j < jc; ++j) {
-                //     printf("%05d \n", visited_cells[i*max_visited_cells+j]);
-                // }
-                // }
-                // There was an error, we could not match some triangles
-                // break;
-            }
-        }
-        num_visited_cells[i] = jc;
-    }
+template <typename float_type>
+void gather_uint32(const uint32_t num_values,
+                   const uint32_t num_indices,
+                   const uint32_t *indices,
+                   const float_type *values,
+                   float_type *result) {
+    const uint32_t block_size = 1024;
+    gather_uint32_kernel<float_type><<<div_round_up(num_indices, block_size), block_size>>>(num_values, num_indices, indices, values, result);
 }
 
-void post_process_tetrahedra(const size_t num_rays,
-                             const size_t max_visited_triangles,
-                             const size_t max_visited_cells,
-                             const unsigned int *num_visited_triangles,
-                             unsigned int *visited_triangles,
-                             const float2 *barycentric_coordinates_triangle,
-                             const float *distances,
-                             unsigned int *visited_cells,
-                             unsigned int *num_visited_cells,
-                             float4 *barycentric_coordinates,
-                             float *cell_distances,
-                             const float eps) {
-    const size_t block_size = 32;
-    post_process_tetrahedra_kernel<<<(num_rays + block_size - 1) / block_size, block_size>>>(num_rays,
-                                                                                             max_visited_triangles,
-                                                                                             max_visited_cells,
-                                                                                             num_visited_triangles,
-                                                                                             visited_triangles,
-                                                                                             barycentric_coordinates_triangle,
-                                                                                             distances,
-                                                                                             visited_cells,
-                                                                                             num_visited_cells,
-                                                                                             barycentric_coordinates,
-                                                                                             cell_distances,
-                                                                                             eps);
+
+template <typename float_type>
+__forceinline__ __device__ float_type atomicEMA(float_type* address, const float_type decay, const float_type update);
+
+template <>
+__forceinline__ __device__ float atomicEMA<float>(float* address, const float decay, const float update) {
+    uint32_t* address_as_u = (uint32_t*)address;
+    uint32_t old = *address_as_u, assumed;
+    float new_val;
+    do {
+        assumed = old;
+        new_val = __float_as_uint(__uint_as_float(assumed) * decay + (1 - decay) * update);
+        old = atomicCAS(address_as_u, assumed, new_val);
+
+    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+    } while (assumed != old);
+    return new_val;
+}
+
+template <>
+__forceinline__ __device__ double atomicEMA<double>(double* address, const double decay, const double update) {
+    unsigned long long int* address_as_u = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_u, assumed;
+    float new_val;
+    do {
+        assumed = old;
+        new_val = __double_as_longlong(__longlong_as_double(assumed) * decay + (1 - decay) * update);
+        old = atomicCAS(address_as_u, assumed, new_val);
+
+    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+    } while (assumed != old);
+    return new_val;
+}
+
+template <typename scalar_t>
+__global__ void scatter_ema_uint32_kernel(const uint32_t num_result,
+                                      const uint32_t num_indices,
+                                      const uint32_t *indices,
+                                      const scalar_t decay,
+                                      const scalar_t *values,
+                                      scalar_t *result) {
+    const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_indices) return;
+
+    const auto target_ind = indices[i];
+    if (target_ind >= num_result) return;
+
+    atomicEMA(&result[target_ind], decay, values[i]);
+}
+
+template <typename float_type>
+void scatter_ema_uint32(const uint32_t num_result,
+                    const uint32_t num_indices,
+                    const uint32_t *indices,
+                    const float_type decay,
+                    const float_type *values,
+                    float_type *result) {
+    const uint32_t block_size = 1024;
+    scatter_ema_uint32_kernel<float_type><<<div_round_up(num_indices, block_size), block_size>>>(num_result, num_indices, indices, decay, values, result);
 }
 
 __global__ void find_matched_cells_kernel(const size_t num_rays,
@@ -187,12 +119,13 @@ __global__ void find_matched_cells_kernel(const size_t num_rays,
                                           const unsigned int *num_visited_cells,
                                           const unsigned int *visited_cells,
                                           const float2 *hit_distances,
-                                          const float4 *barycentric_coordinates,
+                                          const float3 *barycentric_coordinates,
                                           const float *distances,
+                                          const uint4 *vertex_indices,
                                           unsigned int *matched_cells_out,
                                           uint4 *matched_vertices_out,
                                           bool *mask_out,
-                                          float4 *barycentric_coordinates_out) {
+                                          float3 *barycentric_coordinates_out) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
 
@@ -212,20 +145,15 @@ __global__ void find_matched_cells_kernel(const size_t num_rays,
                 const unsigned int visited_cell = visited_cells[i * max_visited_cells + current_cell_pointer];
                 mask_out[i * num_samples_per_ray + j] = 1;
                 matched_cells_out[i * num_samples_per_ray + j] = visited_cell;
-                if (matched_vertices_out != nullptr) {
-                    // NOTE, there is nonlocal access
-                    // This could make the kernel slower, therfore reporting vertices is optional
-                    matched_vertices_out[i * num_samples_per_ray + j] = cells[visited_cell];
-                }
+                matched_vertices_out[i * num_samples_per_ray + j] = vertex_indices[i * max_visited_cells + current_cell_pointer];
 
                 float mult = (current_distance - current_hit_distance.x) / (current_hit_distance.y - current_hit_distance.x);
-                const float4 coords1 = barycentric_coordinates[(i * max_visited_cells + current_cell_pointer) * 2];
-                const float4 coords2 = barycentric_coordinates[(i * max_visited_cells + current_cell_pointer) * 2 + 1];
-                barycentric_coordinates_out[i * num_samples_per_ray + j] = make_float4(
-                    (1-mult) * coords1.x + mult * coords2.x,
-                    (1-mult) * coords1.y + mult * coords2.y,
-                    (1-mult) * coords1.z + mult * coords2.z,
-                    (1-mult) * coords1.w + mult * coords2.w);
+                const float3 coords1 = barycentric_coordinates[(i * max_visited_cells + current_cell_pointer) * 2];
+                const float3 coords2 = barycentric_coordinates[(i * max_visited_cells + current_cell_pointer) * 2 + 1];
+                barycentric_coordinates_out[i * num_samples_per_ray + j] = make_float3(
+                    (1 - mult) * coords1.x + mult * coords2.x,
+                    (1 - mult) * coords1.y + mult * coords2.y,
+                    (1 - mult) * coords1.z + mult * coords2.z);
             }
             // Else there is no match - space between two cells
         }
@@ -239,12 +167,13 @@ void find_matched_cells(const size_t num_rays,
                         const unsigned int *num_visited_cells,
                         const unsigned int *visited_cells,
                         const float2 *hit_distances,
-                        const float4 *barycentric_coordinates,
+                        const float3 *barycentric_coordinates,
                         const float *distances,
+                        const uint4 *vertex_indices,
                         unsigned int *matched_cells_out,
                         uint4 *matched_vertices_out,
                         bool *mask_out,
-                        float4 *barycentric_coordinates_out) {
+                        float3 *barycentric_coordinates_out) {
     const size_t block_size = 16;
     find_matched_cells_kernel<<<(num_rays + block_size - 1) / block_size, block_size>>>(
         num_rays,
@@ -256,82 +185,96 @@ void find_matched_cells(const size_t num_rays,
         hit_distances,
         barycentric_coordinates,
         distances,
+        vertex_indices,
         matched_cells_out,
         matched_vertices_out,
         mask_out,
         barycentric_coordinates_out);
 }
 
-__global__ void interpolate_values_kernel(const size_t num_values,
-                                          const size_t field_dim,
-                                          const size_t num_vertices,
-                                          const uint4 *vertex_indices,
-                                          const float4 *barycentric_coordinates,
+template <uint32_t interpolation_dim>
+__global__ void interpolate_values_kernel(const uint32_t num_vertices,
+                                          const uint32_t num_values,
+                                          const uint32_t field_dim,
+                                          const uint32_t *vertex_indices,
+                                          const float *barycentric_coordinates,
                                           const float *field,
                                           float *result) {
-    unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= num_values) return;
+    constexpr unsigned int empty = ~((unsigned int)0u);
+    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_values) return;
+    unsigned int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    unsigned int j = blockIdx.y;
-    unsigned int i = index;
-
-    const auto bc = barycentric_coordinates[i];
-    const auto vi = vertex_indices[i];
-    result[j * num_values + i] = (bc.x * field[j * num_vertices + vi.x] +
-                                  bc.y * field[j * num_vertices + vi.y] +
-                                  bc.z * field[j * num_vertices + vi.z] +
-                                  bc.w * field[j * num_vertices + vi.w]);
+    float out = 0;
+    float weight = 0;
+#pragma unroll
+    for (uint32_t k = 0; k < interpolation_dim - 1; ++k) {
+        const float &w = barycentric_coordinates[i * (interpolation_dim - 1) + k];
+        const auto &vi = vertex_indices[i * interpolation_dim + k + 1];
+        if (vi != empty)
+            out += w * field[j * num_vertices + vi];
+        weight += w;
+    }
+    if (vertex_indices[i * interpolation_dim] != empty)
+        out += (1.0f - weight) * field[j * num_vertices + vertex_indices[i * interpolation_dim]];
+    result[j * num_values + i] = out;
 }
 
-__global__ void interpolate_values_backward_kernel(const size_t num_vertices,
-                                                   const size_t num_values,
-                                                   const size_t field_dim,
-                                                   const uint4 *vertex_indices,
-                                                   const float4 *barycentric_coordinates,
+template <uint32_t interpolation_dim>
+__global__ void interpolate_values_backward_kernel(const uint32_t num_vertices,
+                                                   const uint32_t num_values,
+                                                   const uint32_t field_dim,
+                                                   const uint32_t *vertex_indices,
+                                                   const float *barycentric_coordinates,
                                                    const float *grad_in,
                                                    float *field_grad_out) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= num_values) return;
-
-    unsigned int j = blockIdx.y;
-    unsigned int i = index;
+    constexpr unsigned int empty = ~((unsigned int)0u);
+    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_values) return;
+    unsigned int j = blockIdx.y * blockDim.y + threadIdx.y;
 
     const auto lgradin = grad_in[j * num_values + i];
-    const auto bc = barycentric_coordinates[i];
-    const auto vi = vertex_indices[i];
-    atomicAdd(&field_grad_out[j * num_vertices + vi.x], bc.x * lgradin);
-    atomicAdd(&field_grad_out[j * num_vertices + vi.y], bc.y * lgradin);
-    atomicAdd(&field_grad_out[j * num_vertices + vi.z], bc.z * lgradin);
-    atomicAdd(&field_grad_out[j * num_vertices + vi.w], bc.w * lgradin);
+    float weight = 0;
+#pragma unroll
+    for (uint32_t k = 0; k < interpolation_dim - 1; ++k) {
+        const float &w = barycentric_coordinates[i * (interpolation_dim - 1) + k];
+        const auto &vi = vertex_indices[i * interpolation_dim + k + 1];
+        if (vi != empty)
+            atomicAdd(&field_grad_out[j * num_vertices + vi], w * lgradin);
+        weight += w;
+    }
+    if (vertex_indices[i * interpolation_dim] != empty)
+        atomicAdd(&field_grad_out[j * num_vertices + vertex_indices[i * interpolation_dim]], (1 - weight) * lgradin);
 }
 
-void interpolate_values(const size_t num_values,
-                        const size_t field_dim,
-                        const size_t num_vertices,
-                        const uint4 *vertex_indices,
-                        const float4 *barycentric_coordinates,
+template <uint32_t interpolation_dim>
+void interpolate_values(const uint32_t num_vertices,
+                        const uint32_t num_values,
+                        const uint32_t field_dim,
+                        const uint32_t *vertex_indices,
+                        const float *barycentric_coordinates,
                         const float *field,
                         float *result) {
-    const size_t block_size = 1024;
-    interpolate_values_kernel<<<dim3((num_values + block_size - 1) / block_size, field_dim), block_size>>>(
-        num_values,
-        field_dim,
-        num_vertices,
-        vertex_indices,
-        barycentric_coordinates,
-        field,
-        result);
+    const uint32_t block_size = 1024;
+    interpolate_values_kernel<interpolation_dim><<<dim3(div_round_up(num_values, block_size), field_dim), block_size>>>(
+        num_vertices, num_values, field_dim, vertex_indices, barycentric_coordinates, field, result);
 }
 
-void interpolate_values_backward(const size_t num_vertices,
-                                 const size_t num_values,
-                                 const size_t field_dim,
-                                 const uint4 *vertex_indices,
-                                 const float4 *barycentric_coordinates,
+template void interpolate_values<2>(const uint32_t num_vertices, const uint32_t num_values, const uint32_t field_dim, const uint32_t *vertex_indices, const float *barycentric_coordinates, const float *field, float *result);
+template void interpolate_values<3>(const uint32_t num_vertices, const uint32_t num_values, const uint32_t field_dim, const uint32_t *vertex_indices, const float *barycentric_coordinates, const float *field, float *result);
+template void interpolate_values<4>(const uint32_t num_vertices, const uint32_t num_values, const uint32_t field_dim, const uint32_t *vertex_indices, const float *barycentric_coordinates, const float *field, float *result);
+template void interpolate_values<6>(const uint32_t num_vertices, const uint32_t num_values, const uint32_t field_dim, const uint32_t *vertex_indices, const float *barycentric_coordinates, const float *field, float *result);
+
+template <uint32_t interpolation_dim>
+void interpolate_values_backward(const uint32_t num_vertices,
+                                 const uint32_t num_values,
+                                 const uint32_t field_dim,
+                                 const uint32_t *vertex_indices,
+                                 const float *barycentric_coordinates,
                                  const float *grad_in,
                                  float *field_grad_out) {
-    const size_t block_size = 1024;
-    interpolate_values_backward_kernel<<<dim3((num_values + block_size - 1) / block_size, field_dim), block_size>>>(
+    const uint32_t block_size = 1024;
+    interpolate_values_backward_kernel<interpolation_dim><<<dim3(div_round_up(num_values, block_size), field_dim), block_size>>>(
         num_vertices,
         num_values,
         field_dim,
@@ -340,3 +283,13 @@ void interpolate_values_backward(const size_t num_vertices,
         grad_in,
         field_grad_out);
 }
+
+template void interpolate_values_backward<2>(const uint32_t num_vertices, const uint32_t num_values, const uint32_t field_dim, const uint32_t *vertex_indices, const float *barycentric_coordinates, const float *grad_in, float *field_grad_out);
+template void interpolate_values_backward<3>(const uint32_t num_vertices, const uint32_t num_values, const uint32_t field_dim, const uint32_t *vertex_indices, const float *barycentric_coordinates, const float *grad_in, float *field_grad_out);
+template void interpolate_values_backward<4>(const uint32_t num_vertices, const uint32_t num_values, const uint32_t field_dim, const uint32_t *vertex_indices, const float *barycentric_coordinates, const float *grad_in, float *field_grad_out);
+template void interpolate_values_backward<6>(const uint32_t num_vertices, const uint32_t num_values, const uint32_t field_dim, const uint32_t *vertex_indices, const float *barycentric_coordinates, const float *grad_in, float *field_grad_out);
+
+template void gather_uint32<float>(const uint32_t num_values, const uint32_t num_indices, const uint32_t *indices, const float *values, float *result);
+template void gather_uint32<double>(const uint32_t num_values, const uint32_t num_indices, const uint32_t *indices, const double *values, double *result);
+template void scatter_ema_uint32<float>(const uint32_t num_result, const uint32_t num_indices, const uint32_t *indices, const float decay, const float *values, float *result);
+template void scatter_ema_uint32<double>(const uint32_t num_result, const uint32_t num_indices, const uint32_t *indices, const double decay, const double *values, double *result);

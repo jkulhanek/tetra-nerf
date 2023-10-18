@@ -1,5 +1,4 @@
 import math
-import os
 import random
 import time
 from pathlib import Path
@@ -60,6 +59,7 @@ def generate_rays(width=800, height=800):
 
 
 def test_traversal_ray_tracing(tmp_path, tetrahedra):
+    tmp_path = Path(".")
     from tetranerf import cpp
 
     # ray_origins, ray_directions = generate_rays(400, 400)
@@ -81,7 +81,7 @@ def test_traversal_ray_tracing(tmp_path, tetrahedra):
             torch.cuda.empty_cache()
             time.sleep(0.50)
         start = time.time()
-        out = tracer.trace_rays(
+        out = tracer.trace_rays_triangles(
             ray_origins,
             ray_directions,
             256,
@@ -89,115 +89,35 @@ def test_traversal_ray_tracing(tmp_path, tetrahedra):
         end = time.time()
         ellapsed += end - start
     print(f"trace_rays time: {ellapsed/20}")
-    ray_samples = (
-        torch.linspace(0.90, 1.1, 300, dtype=torch.float32, device=device)
-        .expand((out["num_visited_cells"].shape[0], 300))
-        .contiguous()
-    )
     start = time.time()
-    inter_out = None
-    # for _ in range(20):
-    #     if inter_out is not None:
-    #         del inter_out
-    if True:
-        inter_out = tracer.find_visited_cells(
-            out["num_visited_cells"],
-            out["visited_cells"],
-            out["barycentric_coordinates"],
-            out["hit_distances"],
-            out["vertex_indices"],
-            ray_samples,
-        )
-    # end = time.time()
-    # print(f"find_visited_cells time: {(end - start)/20}")
     torch.set_printoptions(linewidth=200, sci_mode=False)
-    print(inter_out["mask"].shape)
-    print(inter_out["mask"].max())
-    print(inter_out["mask"].int().sum(-1).argmax())
-    # print(inter_out["mask"][56607].int())
-    mask = torch.arange(out["hit_distances"].shape[1])[None, :] < out["num_visited_cells"][:, None].cpu()
-    space = (out["hit_distances"][:, 1:, 0] - out["hit_distances"][:, :-1, 1]).abs().cpu() * mask[:, 1:]
-    ray_max, ray_min = (
-        out["hit_distances"][:, :, 1].cpu().max(1)[0],
-        (out["hit_distances"][:, :, 0].cpu() + (1 - mask.int()) * 10e4).min(1)[0],
-    )
-    print(out["hit_distances"][:, :, 0].cpu()[mask > 0].min())
-    ray_len = (
-        out["hit_distances"][:, :, 1].cpu().max(1)[0]
-        - (out["hit_distances"][:, :, 0].cpu() + (1 - mask.int()) * 10e4).min(1)[0]
-    )
-    print("min: ", ray_min[ray_len > 0].min(), "max:", ray_max[ray_len > 0].max())
-    valid_samples = (
-        torch.logical_and(ray_min[:, None] < ray_samples.cpu(), ray_samples.cpu() < ray_max[:, None]).int().sum(-1)
-    )
-    actual_samples = (
-        (
-            torch.logical_and(
-                ray_min[:, None] < ray_samples.cpu(),
-                ray_samples.cpu() < ray_max[:, None],
-            ).int()
-            * inter_out["mask"].cpu().int()
-        )
-        .int()
-        .sum(-1)
-    )
-    print("invalid ray portion", ((space.sum(-1) / (ray_len + 1e-4)))[ray_len > 0].mean())
-    print(
-        "invalid ray samples",
-        (1 - (actual_samples / (valid_samples + 1e-4)))[ray_len > 0].mean(),
-    )
+    mask = torch.arange(out["hit_distances"].shape[1])[None, :] < out["num_visited_triangles"][:, None].cpu()
 
-    (nonempty_rays,) = np.where(inter_out["mask"].int().sum(-1).cpu().numpy() > 0)
+    (nonempty_rays,) = np.where(out["num_visited_triangles"].int().cpu().numpy() > 0)
     points = []
     pc = []
     random.seed(42)
     rays = random.choices(list(nonempty_rays), k=100)
-    nfaces = []
     # rays = [56607]
     nnpointsx = []
-    print(rays)
     # rays = [97810]
-
     # ray = 97810
-    ray = 8
-    print(actual_samples[ray], "/", valid_samples[ray])
-    print(inter_out["mask"][ray].int())
-    print(
-        ((out["hit_distances"][ray, 1:, 0] - out["hit_distances"][ray, :-1, 1]).abs().cpu() * mask[ray, 1:]).sum(-1),
-        "/",
-        ray_len[ray],
-    )
 
+    mask = torch.arange(out["hit_distances"].shape[1])[None, :] < out["num_visited_triangles"][:, None].cpu()
     for r in rays:
-        for c in range(out["num_visited_cells"][r]):
+        for c in range(out["num_visited_triangles"][r]):
             endpoints = tetrahedra["vertices"][out["vertex_indices"][r, c].cpu().numpy(), :]
             coords = out["barycentric_coordinates"][r, c]
             coords = torch.cat((1-coords.sum(-1, keepdim=True), coords), -1).cpu().numpy()
-            # print(coords)
-            v1, v2 = coords @ endpoints
-            l = np.linspace(0, 1, 100)[:, None]
-            points.append(v1 * (1-l) + v2 * l)
-            pc.append(np.full((100, 4), 255, dtype=np.uint8))
-            # cell2 = tetrahedra["cells"][out["visited_cells"][r, c].cpu().numpy(), :]
-            # cell2 = np.concatenate((cell2, cell2), -1)
-            # nfaces.append(
-            #     np.stack(
-            #         [
-            #             cell2[1:4],
-            #             cell2[2:5],
-            #             cell2[3:6],
-            #             cell2[4:7],
-            #         ]
-            #     )
-            # )
+            v = coords @ endpoints
+            points.append(v)
+            pc.append(np.full((1, 4), 255, dtype=np.uint8))
 
         # Test interpolated points
-        print(inter_out["mask"].shape)
-        print(inter_out["vertex_indices"].shape)
-        endpoints = inter_out["vertex_indices"][r][inter_out["mask"][r]].cpu().numpy()
+        endpoints = out["vertex_indices"][r][mask[r]].cpu().numpy()
         nnpoints = tetrahedra["vertices"][endpoints]
-        gt_barycentric_coords = torch.cat((1-inter_out["barycentric_coordinates"].sum(-1, keepdim=True), inter_out["barycentric_coordinates"]), -1)
-        mults = gt_barycentric_coords[r][inter_out["mask"][r]].cpu().numpy()
+        gt_barycentric_coords = torch.cat((1-out["barycentric_coordinates"].sum(-1, keepdim=True), out["barycentric_coordinates"]), -1)
+        mults = gt_barycentric_coords[r][mask[r]].cpu().numpy()
         nnpoints = (nnpoints * mults[..., None]).sum(-2)
         nnpointsx.append(nnpoints)
 
@@ -207,15 +127,6 @@ def test_traversal_ray_tracing(tmp_path, tetrahedra):
             raise RuntimeError("Points not projected onto the ray")
     print(nnpointsx[0].shape)
     trimesh.PointCloud(vertices=np.concatenate(nnpointsx, 0)).export(str(tmp_path / "intepolated_points.ply"))
-    # trimesh.PointCloud(vertices=np.concatenate(points, 0)).export(str(tmp_path / "intepolated_points.ply"))
-
-    # points.append(ray_origins.cpu().numpy()[r:r+1] + np.linspace(0.8, 1, 200)[:, None] @ ray_directions.cpu().numpy()[r:r+1])
-    # pc.append(np.array([[255, 0, 0, 255]] * 200, dtype=np.uint8))
-    # points = np.concatenate(points, 0)
-    # pc = np.concatenate(pc, 0)
-    # trimesh.Trimesh(tetrahedra["vertices"], np.concatenate(nfaces, 0)).export("test_mesh.ply")
-    # pcc = trimesh.PointCloud(points, pc)
-    # pcc.export("test_points.ply")
 
 
 def mix_float3(data, m, *args):
@@ -262,7 +173,7 @@ def test_trace_rays_simple():
 
     tracer = cpp.TetrahedraTracer(device)
     tracer.load_tetrahedra(d_tetrahedra_points, d_tetrahedra_cells)
-    out = tracer.trace_rays(d_origins, d_directions, 16)
+    out = tracer.trace_rays_triangles(d_origins, d_directions, 16)
 
     # TODO: check results
 
@@ -361,28 +272,14 @@ def test_tetrahedra_interpolate_values(tetrahedra):
     tracer = cpp.TetrahedraTracer(device)
     tracer.load_tetrahedra(cuda_vertices, cuda_cells)
 
-    out = tracer.trace_rays(
+    max_triangles = 256
+    out = tracer.trace_rays_triangles(
         ray_origins,
         ray_directions,
-        256,
-    )
-    num_ray_samples = 256
-    ray_samples = (
-        torch.linspace(0.90, 1.1, num_ray_samples, dtype=torch.float32, device=device)
-        .expand((num_rays, num_ray_samples))
-        .contiguous()
-    )
-    inter_out = tracer.find_visited_cells(
-        out["num_visited_cells"],
-        out["visited_cells"],
-        out["barycentric_coordinates"],
-        out["hit_distances"],
-        out["vertex_indices"],
-        ray_samples,
+        max_triangles,
     )
 
     # Save some momory
-    del out
     torch.cuda.empty_cache()
     time.sleep(0.1)
 
@@ -390,7 +287,7 @@ def test_tetrahedra_interpolate_values(tetrahedra):
     num_vertices = len(tetrahedra["vertices"])
     field = torch.empty((64, num_vertices), dtype=torch.float32, device=device).random_()
     ellapsed = 0
-    vi = inter_out["vertex_indices"]
+    vi = out["vertex_indices"]
     safe_vi = vi.long().clamp_max(field.size(-1))
     def get_field_safe(field):
         return torch.where(vi >= 0, field[:, safe_vi], torch.zeros_like(field[:, safe_vi]))
@@ -398,16 +295,16 @@ def test_tetrahedra_interpolate_values(tetrahedra):
         start = time.time()
         val = interpolate_values(
             vi,
-            inter_out["barycentric_coordinates"],
+            out["barycentric_coordinates"],
             field,
         )
         end = time.time()
         ellapsed += end - start
-        assert val.shape == (num_rays, num_ray_samples, 64)
+        assert val.shape == (num_rays, max_triangles, 64)
         if i == 0:
             print("fingerprint: ", val.sum())
             # test
-            gt_barycentric_coords = torch.cat((1-inter_out["barycentric_coordinates"].sum(-1, keepdim=True), inter_out["barycentric_coordinates"]), -1)
+            gt_barycentric_coords = torch.cat((1-out["barycentric_coordinates"].sum(-1, keepdim=True), out["barycentric_coordinates"]), -1)
             gt = torch.einsum(
                 "jrbi,rbi->rbj",
                 get_field_safe(field),
@@ -423,8 +320,8 @@ def test_tetrahedra_interpolate_values(tetrahedra):
     field.requires_grad_(True)
     for i in range(20):
         val = interpolate_values(
-            inter_out["vertex_indices"],
-            inter_out["barycentric_coordinates"],
+            out["vertex_indices"],
+            out["barycentric_coordinates"],
             field,
         )
         start = time.time()
@@ -436,12 +333,11 @@ def test_tetrahedra_interpolate_values(tetrahedra):
         ellapsed += end - start
         assert grad.shape == (64, num_vertices)
         if i == 0:
-            pass
             # print("fingerprint: ", val.sum())
             # # test
             field2 = field.detach().clone()
             field2.requires_grad_(True)
-            gt_barycentric_coords = torch.cat((1-inter_out["barycentric_coordinates"].sum(-1, keepdim=True), inter_out["barycentric_coordinates"]), -1)
+            gt_barycentric_coords = torch.cat((1-out["barycentric_coordinates"].sum(-1, keepdim=True), out["barycentric_coordinates"]), -1)
             gt = torch.einsum(
                 "jrbi,rbi->rj",
                 get_field_safe(field2),

@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22.1)
 project(fast_traversal LANGUAGES CXX CUDA)
 enable_language(CUDA)
 
+include(FetchContent)
 # Add paths to our CMake code to the module path, so they can be found automatically by
 # CMake.
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
@@ -73,9 +74,10 @@ find_program(BIN2C bin2c
   DOC "Path to the cuda-sdk bin2c executable.")
 
 
-macro(cuda_compile_and_embed output_var generated_files)
+macro(cuda_compile_and_embed output_var generated_files_name)
     set(c_var_name ${output_var})
-    list(GET generated_files 0 ptx_file)
+    set(generated_files "${${generated_files_name}}")
+    list(GET "${generated_files_name}" 0 ptx_file)
     get_filename_component(embedded_file ${ptx_file}_embedded.cpp NAME)
     set(embedded_file "${BUILD_DIRECTORY}/${embedded_file}")
     add_custom_command(
@@ -84,17 +86,32 @@ macro(cuda_compile_and_embed output_var generated_files)
         DEPENDS ${ptx_files} ${generated_files}
         COMMENT "compiling (and embedding ptx from) ${cuda_file}")
     set(${output_var} ${embedded_file})
-    list(APPEND generated_files ${embedded_file})
+    list(APPEND "${generated_files_name}" ${embedded_file})
 endmacro()
 
 
-CUDA_WRAP_SRCS(traversal PTX generated_files 
+CUDA_WRAP_SRCS(traversal PTX generated_files_trace_rays
     src/optix_types.h
-    src/optix_traversal.cu
+    src/optix/optix_trace_rays.cu
     src/utils/preprocessor.h
     src/utils/vec_math.h
     OPTIONS -rdc true)
-cuda_compile_and_embed(ptx_code_file ${generated_files})
+cuda_compile_and_embed(ptx_code_file generated_files_trace_rays)
+CUDA_WRAP_SRCS(traversal PTX generated_files_find_tetrahedra
+    src/optix_types.h
+    src/optix/optix_find_tetrahedra.cu
+    src/utils/preprocessor.h
+    src/utils/vec_math.h
+    OPTIONS -rdc true)
+cuda_compile_and_embed(ptx_code_file_find_tetrahedra generated_files_find_tetrahedra)
+CUDA_WRAP_SRCS(traversal PTX generated_files_trace_rays_triangles
+    src/optix_types.h
+    src/optix/optix_trace_rays_triangles.cu
+    src/utils/preprocessor.h
+    src/utils/vec_math.h
+    OPTIONS -rdc true)
+cuda_compile_and_embed(ptx_code_file_triangles generated_files_trace_rays_triangles)
+set(generated_files ${generated_files_trace_rays} ${generated_files_find_tetrahedra} ${generated_files_trace_rays_triangles})
 
 # configure_file(${generated_files} file.ptx.h)
 add_link_options(-flto=auto)  # disables some warning

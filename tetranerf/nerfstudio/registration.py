@@ -1,12 +1,17 @@
+from functools import partial
 import dataclasses
-
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManagerConfig
-from nerfstudio.data.dataparsers.minimal_dataparser import MinimalDataParserConfig
 from nerfstudio.engine.optimizers import RAdamOptimizerConfig
 from nerfstudio.engine.schedulers import ExponentialDecaySchedulerConfig
 from nerfstudio.engine.trainer import TrainerConfig
 from nerfstudio.pipelines.base_pipeline import VanillaPipelineConfig
 from nerfstudio.plugins.types import MethodSpecification
+try:
+    from nerfstudio.data.dataparsers.colmap_dataparser import ColmapDataParserConfig
+    DPConfig = partial(ColmapDataParserConfig, load_3D_points=True)
+except ImportError:
+    # Older NerfStudio versions
+    from nerfstudio.data.dataparsers.minimal_dataparser import MinimalDataParserConfig as DPConfig
 
 from .model import TetrahedraNerf, TetrahedraNerfConfig
 from .pipeline import TetrahedraNerfPipeline
@@ -17,7 +22,7 @@ tetranerf_original_config = TrainerConfig(
         _target=TetrahedraNerfPipeline,
         datamanager=VanillaDataManagerConfig(
             # _target=RayPruningDataManager,
-            dataparser=MinimalDataParserConfig(),
+            dataparser=DPConfig(),
             eval_num_rays_per_batch=4096,
             train_num_rays_per_batch=4096,
         ),

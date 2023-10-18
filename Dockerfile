@@ -7,7 +7,7 @@
 #     `docker build -t tetra-nerf:latest --build-context optix=/opt/optix
 # The image can be run with the following command:
 #     `docker run -it --gpus all tetra-nerf:latest`
-FROM dromni/nerfstudio:0.2.2
+FROM dromni/nerfstudio:0.3.4
 COPY --from=optix . /opt/optix
 RUN if [ ! -e /opt/optix/include/optix.h ]; then echo "Could not find the OptiX library. Please install the Optix SDK and add the following argument to the buildx command: --build-context optix=/path/to/the/SDK"; exit 1; fi
 
@@ -29,9 +29,13 @@ COPY --chown=1000 . /home/user/tetra-nerf
 USER 1000
 RUN path="$PWD" && cd /home/user/tetra-nerf && \
     python3.10 -m pip install -e . && \
-    cd "$path" && \
-    (ns-install-cli --mode install || echo "Skipping ns-cli-install, user nvidia runtime to run it")
-    # Install cli for users who use nvidia runtime during build
+    python3.10 -m pip install pytest && \
+    python3.10 -m pip cache purge && \
+    cd "$path"
+
+# Install completions, lerf loads GPU so we just remove it for install the completions
+RUN pip uninstall -y lerf && \
+    ns-install-cli --mode install
 
 # Remove /opt/optix due to its license
 # Also link python as python3 (could be done with python-is-python3)
@@ -39,3 +43,5 @@ USER root
 RUN rm -rf /opt/optix && \
     [ -e /usr/bin/python ] || ln -s /usr/bin/python3 /usr/bin/python
 USER 1000
+
+CMD /bin/bash -l

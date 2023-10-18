@@ -45,10 +45,9 @@ the training images. In that case, you can use the `--separate-training-pointclo
 With this flag turned on, the script will create two sparse models: 
 first with all images to get the camera poses of all images and the second from only the training images. 
 
-Finally, generate the tetrahedra and start the training:
+Finally, start the training:
 ```bash
-python -m tetranerf.scripts.triangulate --pointcloud <data folder>/sparse.ply --output <data folder>/sparse.th
-ns-train tetra-nerf --pipeline.model.tetrahedra-path <data folder>/sparse.th minimal-parser --data <data folder>
+ns-train tetra-nerf colmap --data <data folder>
 ```
 
 ### With existing COLMAP
@@ -61,12 +60,11 @@ sparse
     cameras.bin
     ...
 ```
-Now, run the following command to export the training data and point cloud:
-```bash
-python -m tetranerf.scripts.process_images --path <path to the data folder>
-```
-You can then follow the instructions in the [without existing colmap model section](#without-existing-colmap-model).
 
+Finally, start the training:
+```bash
+ns-train tetra-nerf colmap --data <data folder>
+```
 
 ## Reproducing results
 We first give instructions on how to download and preprocess the data, and run the training.
@@ -138,7 +136,11 @@ The OptiX library can be installed from here [https://developer.nvidia.com/desig
 
 Finally, you can install **Tetra-NeRF** by running:
 ```
-pip install git+https://github.com/jkulhanek/tetra-nerf
+git clone https://github.com/jkulhanek/tetra-nerf
+cd tetra-nerf
+cmake .
+make 
+pip install -e .
 ```
 
 ### Docker

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Literal
 import os
 
-import nerfstudio.utils
 import torch
 from nerfstudio.cameras.rays import RayBundle, RaySamples
 from nerfstudio.field_components.encodings import NeRFEncoding
@@ -35,7 +34,7 @@ from torchmetrics import PeakSignalNoiseRatio
 from torchmetrics.functional import structural_similarity_index_measure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
-from ..utils.extension import TetrahedraTracer, interpolate_values
+from ..utils.extension import TetrahedraTracer, interpolate_values, triangulate
 
 CONSOLE = Console(width=120)
 
@@ -75,7 +74,7 @@ class TetrahedraNerfConfig(ModelConfig):
     num_tetrahedra_vertices: Optional[int] = None
     num_tetrahedra_cells: Optional[int] = None
 
-    max_intersected_triangles: int = 512  # TODO: try 1024
+    max_intersected_triangles: int = 512
     num_samples: int = 256
     num_fine_samples: int = 256
     use_biased_sampler: bool = False
@@ -91,8 +90,13 @@ class TetrahedraNerfConfig(ModelConfig):
 
     use_gradient_scaling: bool = False
     """Use gradient scaler where the gradients are lower for points closer to the camera."""
-
     background_color: Literal["random", "last_sample", "black", "white"] = "white"
+
+    appearance_embed_dim: int = 0
+    """Embedding dimension for per-image embeddings. Defaults to 0 (no embedding)"""
+
+    use_occupancy_field: bool = False
+    """Use an occupancy field to determine which tetrahedra are occupied."""
 
     def __post_init__(self):
         if self.tetrahedra_path is not None and self.num_tetrahedra_vertices is None:
@@ -105,13 +109,11 @@ class TetrahedraNerfConfig(ModelConfig):
 
 # Map from uniform space to transformed space
 def map_from_real_distances_to_biased_with_bounds(num_bounds, bounds, samples):
-    lengths = bounds[..., 1] - bounds[..., 0]
-    sum_lengths = lengths.sum(-1)
-    part_len = sum_lengths / num_bounds
+    lengths = (bounds[..., 1] - bounds[..., 0]).clamp_min_(0)
     bounds_start = bounds[..., 0, 0]
     bounds_end = torch.gather(bounds[..., 1], 1, (num_bounds[:, None] - 1).clamp_min_(0)).squeeze(-1)
-    rest = (samples - bounds_start[..., None]) / (bounds_end - bounds_start)[..., None]
-    rest *= num_bounds[..., None]
+    unisamples = (samples - bounds_start[..., None]) / (bounds_end - bounds_start)[..., None]
+    rest = unisamples.mul_(num_bounds[..., None])
     intervals = rest.floor().clamp_max_(num_bounds[..., None] - 1).clamp_min_(0)
     rest = rest - intervals
     intervals = intervals.long()
@@ -218,36 +220,50 @@ class TetrahedraNerf(Model):
         config: TetrahedraNerfConfig,
         dataparser_transform=None,
         dataparser_scale=None,
+        metadata=None,
         **kwargs,
     ) -> None:
         super().__init__(
             config=config,
             **kwargs,
         )
-
         self.dataparser_transform = dataparser_transform
         self.dataparser_scale = dataparser_scale
         self._tetrahedra_tracer = None
-        if self.config.num_tetrahedra_vertices is None:
-            raise RuntimeError("The tetrahedra_path must be specified.")
-        self.register_buffer(
-            "tetrahedra_vertices",
-            torch.empty((self.config.num_tetrahedra_vertices, 3), dtype=torch.float32),
-        )
-        self.register_buffer(
-            "tetrahedra_cells",
-            torch.empty((self.config.num_tetrahedra_cells, 4), dtype=torch.int32),
-        )
-        self.register_parameter(
-            "tetrahedra_field",
-            nn.Parameter(
-                torch.empty(
-                    (self.config.field_dim, self.config.num_tetrahedra_vertices),
-                    dtype=torch.float32,
+        self._step = 0
+        if self.config.tetrahedra_path is None and metadata is not None and "points3D_xyz" in metadata:
+            self._load_points_from_metadata(**metadata)
+        else:
+            if self.config.num_tetrahedra_vertices is None:
+                raise RuntimeError("The tetrahedra_path must be specified.")
+            self.register_buffer(
+                "tetrahedra_vertices",
+                torch.empty((self.config.num_tetrahedra_vertices, 3), dtype=torch.float32),
+            )
+            self.register_buffer(
+                "tetrahedra_cells",
+                torch.empty((self.config.num_tetrahedra_cells, 4), dtype=torch.int32),
+            )
+            self.register_parameter(
+                "tetrahedra_field",
+                nn.Parameter(
+                    torch.empty(
+                        (self.config.field_dim, self.config.num_tetrahedra_vertices),
+                        dtype=torch.float32,
+                    )
+                ),
+            )
+            if self.config.use_occupancy_field:
+                self.register_buffer(
+                    "tetrahedra_occupancy",
+                    nn.Parameter(
+                        torch.zeros(
+                            (self.config.num_tetrahedra_cells,),
+                            dtype=torch.float32,
+                        )
+                    ),
                 )
-            ),
-        )
-        self._tetrahedra_initialized = False
+            self._tetrahedra_initialized = False
 
     @staticmethod
     def _init_tetrahedra_field(tetrahedra_field):
@@ -282,6 +298,53 @@ class TetrahedraNerf(Model):
         )
         if will_initialize:
             self._tetrahedra_initialized = True
+
+    def _load_points_from_metadata(self, points3D_xyz, points3D_rgb=None, **kwargs):
+        CONSOLE.print("Loading points from data parser")
+        tetrahedra_vertices = points3D_xyz
+        tetrahedra_cells = triangulate(tetrahedra_vertices).int()
+        num_tetrahedra_vertices = len(tetrahedra_vertices)
+        self.config.num_tetrahedra_cells = len(tetrahedra_cells)
+        self.config.num_tetrahedra_vertices = num_tetrahedra_vertices
+        self.register_buffer(
+            "tetrahedra_vertices",
+            tetrahedra_vertices,
+        )
+        self.register_buffer(
+            "tetrahedra_cells",
+            tetrahedra_cells.to(torch.int32),
+        )
+        self.register_parameter(
+            "tetrahedra_field",
+            nn.Parameter(
+                torch.empty(
+                    (self.config.field_dim, self.config.num_tetrahedra_vertices),
+                    dtype=torch.float32,
+                )
+            ),
+        )
+        if self.config.use_occupancy_field:
+            self.register_buffer(
+                "tetrahedra_occupancy",
+                nn.Parameter(
+                    torch.zeros(
+                        (self.config.num_tetrahedra_cells,),
+                        dtype=torch.float32,
+                    )
+                ),
+            )
+        self._init_tetrahedra_field(self.tetrahedra_field.data)
+        if self.config.initialize_colors:
+            assert points3D_rgb is not None
+            assert points3D_rgb.dtype == torch.uint8
+            assert points3D_rgb.shape == (num_tetrahedra_vertices, 3)
+            colors = points3D_rgb.float().to(self.tetrahedra_field.device) * 2.0 / 255.0 - 1.0
+            self.tetrahedra_field.data[1:4, :] = colors[:, :3].T
+            self.tetrahedra_field.data[0, :] = 1.0  # To be compatible with the old code
+        CONSOLE.print("Tetrahedra initialized from dataparser:")
+        CONSOLE.print(f"    Num points: {len(self.tetrahedra_vertices)}")
+        CONSOLE.print(f"    Num tetrahedra: {len(self.tetrahedra_cells)}")
+        self._tetrahedra_initialized = True
 
     def _init_tetrahedra(self):
         if self.config.tetrahedra_path is not None:
@@ -373,8 +436,16 @@ class TetrahedraNerf(Model):
             layer_width=self.config.hidden_size,
             out_activation=nn.ReLU(),
         )
+        head_input_dim = self.mlp_base.get_out_dim() + self.direction_encoding.get_out_dim()
+        if self.config.appearance_embed_dim > 0:
+            self.appearance_embedding = nn.Embedding(
+                self.num_train_data,
+                self.config.appearance_embed_dim,
+            )
+            head_input_dim += self.config.appearance_embed_dim
+
         self.mlp_head = MLP(
-            in_dim=self.mlp_base.get_out_dim() + self.direction_encoding.get_out_dim(),
+            in_dim=head_input_dim,
             num_layers=self.config.num_color_layers,
             layer_width=self.config.hidden_size,
             out_activation=nn.ReLU(),
@@ -431,7 +502,9 @@ class TetrahedraNerf(Model):
         return param_groups
 
     def get_background_color(self, shape, device):
-        # TODO: new NS version can return this from the renderer
+        if hasattr(self.renderer_rgb, "get_background_color"):
+            return self.renderer_rgb.get_background_color(self.renderer_rgb.background_color, shape, device)
+        # NOTE: this is here for older NS versions
         background_color = self.config.background_color
         if renderers.BACKGROUND_COLOR_OVERRIDE is not None:
             background_color = renderers.BACKGROUND_COLOR_OVERRIDE
@@ -470,6 +543,7 @@ class TetrahedraNerf(Model):
             ray_bundle_modified_r = dataclasses.replace(ray_bundle[ray_mask], nears=nears_r, fars=fars_r)
 
             # Apply biased sampling
+            visited_tetrahedra = tracer_output["visited_cells"][ray_mask]
             if isinstance(self.sampler_uniform, TetrahedraSampler):
                 ray_samples_r: RaySamples = self.sampler_uniform(
                     ray_bundle_modified_r,
@@ -483,9 +557,10 @@ class TetrahedraNerf(Model):
             # Trace matched cells and interpolate field
             traced_cells = tracer.find_visited_cells(
                 tracer_output["num_visited_cells"][ray_mask],
-                tracer_output["visited_cells"][ray_mask],
+                visited_tetrahedra,
                 tracer_output["barycentric_coordinates"][ray_mask],
                 tracer_output["hit_distances"][ray_mask],
+                tracer_output["vertex_indices"][ray_mask],
                 distances_r.squeeze(-1),
             )
             barycentric_coords = traced_cells["barycentric_coordinates"]
@@ -512,6 +587,7 @@ class TetrahedraNerf(Model):
                     tracer_output["visited_cells"][ray_mask],
                     tracer_output["barycentric_coordinates"][ray_mask],
                     tracer_output["hit_distances"][ray_mask],
+                    tracer_output["vertex_indices"][ray_mask],
                     distances_r.squeeze(-1),
                 )
                 barycentric_coords = traced_cells["barycentric_coordinates"]
@@ -527,7 +603,18 @@ class TetrahedraNerf(Model):
             field_outputs = {}
             field_outputs[self.field_output_density.field_head_name] = self.field_output_density(base_mlp_out)
             encoded_dir = self.direction_encoding(ray_samples_r.frustums.directions)
-            mlp_out = self.mlp_head(torch.cat([encoded_dir, base_mlp_out], dim=-1))  # type: ignore
+            mlp_out = [encoded_dir, base_mlp_out]
+            if self.config.appearance_embed_dim > 0:
+                # appearance
+                if self.training:
+                    camera_indices = ray_samples_r.camera_indices.squeeze()
+                    embedded_appearance = self.appearance_embedding(camera_indices)
+                else:
+                    embedded_appearance = torch.ones(
+                        (*encoded_dir.shape[:-1], self.config.appearance_embed_dim), device=encoded_dir.device
+                    ) * self.appearance_embedding.weight.mean(dim=0)
+                mlp_out.append(embedded_appearance)
+            mlp_out = self.mlp_head(torch.cat(mlp_out, dim=-1))  # type: ignore
             field_outputs[self.field_output_color.field_head_name] = self.field_output_color(mlp_out)
 
             colors = field_outputs[FieldHeadNames.RGB]
@@ -605,10 +692,9 @@ class TetrahedraNerf(Model):
         psnr = self.psnr(image, rgb)
         lpips = self.lpips(image, rgb)
 
+        # "lpips_vgg": float(self.lpips_vgg(image, rgb)),
         metrics_dict = {
             "psnr": float(psnr.item()),
-            "lpips": float(lpips),
-            # "lpips_vgg": float(self.lpips_vgg(image, rgb)),
             "nerfstudio_ssim": float(self.nerfstudio_ssim(image, rgb)),
             "skimage_ssim": float(self.skimage_ssim(image, rgb)),
             "lpips": float(lpips),
