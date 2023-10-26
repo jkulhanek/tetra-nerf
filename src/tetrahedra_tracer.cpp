@@ -174,13 +174,39 @@ TetrahedraTracer::~TetrahedraTracer() noexcept(false) {
     trace_rays_triangles_pipeline.~TraceRaysTrianglesPipeline();
     find_tetrahedra_pipeline.~FindTetrahedraPipeline();
 
-    CUDA_CHECK(cudaSetDevice(device));
-    OPTIX_CHECK(optixDeviceContextDestroy(context));
+    if (context != nullptr && device != -1) {
+        CUDA_CHECK(cudaSetDevice(device));
+        OPTIX_CHECK(optixDeviceContextDestroy(std::exchange(context, nullptr)));
+    }
 }
 
+TetrahedraStructure::TetrahedraStructure() noexcept
+    : device(-1),
+      context(nullptr),
+      gas_handle_(0),
+      d_gas_output_buffer(0),
+      num_vertices(0),
+      num_cells(0),
+      tetrahedra_vertices(nullptr),
+      triangle_indices_(nullptr),
+      triangle_tetrahedra_(nullptr) {}
+
+
+TetrahedraStructure::TetrahedraStructure(TetrahedraStructure &&other) noexcept
+    : device(std::exchange(other.device, -1)),
+      context(std::exchange(other.context, nullptr)),
+      gas_handle_(std::exchange(other.gas_handle_, 0)),
+      d_gas_output_buffer(std::exchange(other.d_gas_output_buffer, 0)),
+      num_vertices(std::exchange(other.num_vertices, 0)),
+      num_cells(std::exchange(other.num_cells, 0)),
+      tetrahedra_vertices(std::exchange(other.tetrahedra_vertices, nullptr)),
+      triangle_indices_(std::exchange(other.triangle_indices_, nullptr)),
+      triangle_tetrahedra_(std::exchange(other.triangle_tetrahedra_, nullptr)) {}
+
 void TetrahedraStructure::release() {
-    CUDA_CHECK(cudaSetDevice(device));
+    bool device_set = false;
     if (d_gas_output_buffer != 0) {
+        if (!device_set) { CUDA_CHECK(cudaSetDevice(device)); device_set = true; }
         CUDA_CHECK(cudaFree(reinterpret_cast<void *>(d_gas_output_buffer)));
         d_gas_output_buffer = 0;
     }
@@ -189,10 +215,12 @@ void TetrahedraStructure::release() {
     // NOTE: we do not own the vertices and cells arrays
     tetrahedra_vertices = nullptr;
     if (triangle_indices_ != nullptr) {
+        if (!device_set) { CUDA_CHECK(cudaSetDevice(device)); device_set = true; }
         CUDA_CHECK(cudaFree(reinterpret_cast<void *>(triangle_indices_)));
         triangle_indices_ = nullptr;
     }
     if (triangle_tetrahedra_ != nullptr) {
+        if (!device_set) { CUDA_CHECK(cudaSetDevice(device)); device_set = true; }
         CUDA_CHECK(cudaFree(reinterpret_cast<void *>(triangle_tetrahedra_)));
         triangle_tetrahedra_ = nullptr;
     }
@@ -495,8 +523,24 @@ TraceRaysPipeline::TraceRaysPipeline(const OptixDeviceContext &context, int8_t d
     }
 }
 
+
+TraceRaysPipeline::TraceRaysPipeline(TraceRaysPipeline &&other) noexcept
+    : device(std::exchange(other.device, -1)),
+      context(std::exchange(other.context, nullptr)),
+      pipeline(std::exchange(other.pipeline, nullptr)),
+      raygen_prog_group(std::exchange(other.raygen_prog_group, nullptr)),
+      miss_prog_group(std::exchange(other.miss_prog_group, nullptr)),
+      hitgroup_prog_group(std::exchange(other.hitgroup_prog_group, nullptr)),
+      module(std::exchange(other.module, nullptr)),
+      sbt(std::exchange(other.sbt, {})),
+      stream(std::exchange(other.stream, nullptr)),
+      d_param(std::exchange(other.d_param, 0)) {}
+      
+
+
 TraceRaysPipeline::~TraceRaysPipeline() noexcept(false) {
-    if (was_disposed) {
+    const auto device = std::exchange(this->device, -1);
+    if (device == -1) {
         return;
     }
     CUDA_CHECK(cudaSetDevice(device));
@@ -720,11 +764,23 @@ FindTetrahedraPipeline::FindTetrahedraPipeline(const OptixDeviceContext &context
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_param), sizeof(ParamsFindTetrahedra)));
 }
 
+FindTetrahedraPipeline::FindTetrahedraPipeline(FindTetrahedraPipeline &&other) noexcept
+    : device(std::exchange(other.device, -1)),
+      context(std::exchange(other.context, nullptr)),
+      pipeline(std::exchange(other.pipeline, nullptr)),
+      raygen_prog_group(std::exchange(other.raygen_prog_group, nullptr)),
+      miss_prog_group(std::exchange(other.miss_prog_group, nullptr)),
+      hitgroup_prog_group(std::exchange(other.hitgroup_prog_group, nullptr)),
+      module(std::exchange(other.module, nullptr)),
+      sbt(std::exchange(other.sbt, {})),
+      stream(std::exchange(other.stream, nullptr)),
+      d_param(std::exchange(other.d_param, 0)) {}
+
 FindTetrahedraPipeline::~FindTetrahedraPipeline() noexcept(false) {
-    if (was_disposed) {
+    const auto device = std::exchange(this->device, -1);
+    if (device == -1) {
         return;
     }
-    CUDA_CHECK(cudaSetDevice(device));
     if (d_param != 0)
         CUDA_CHECK(cudaFree(reinterpret_cast<void *>(std::exchange(d_param, 0))));
     if (sbt.raygenRecord != 0)
@@ -1011,8 +1067,21 @@ void TraceRaysTrianglesPipeline::trace_rays(const TetrahedraStructure *tetrahedr
     CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
+TraceRaysTrianglesPipeline::TraceRaysTrianglesPipeline(TraceRaysTrianglesPipeline &&other) noexcept
+    : device(std::exchange(other.device, -1)),
+      context(std::exchange(other.context, nullptr)),
+      pipeline(std::exchange(other.pipeline, nullptr)),
+      raygen_prog_group(std::exchange(other.raygen_prog_group, nullptr)),
+      miss_prog_group(std::exchange(other.miss_prog_group, nullptr)),
+      hitgroup_prog_group(std::exchange(other.hitgroup_prog_group, nullptr)),
+      module(std::exchange(other.module, nullptr)),
+      sbt(std::exchange(other.sbt, {})),
+      stream(std::exchange(other.stream, nullptr)),
+      d_param(std::exchange(other.d_param, 0)) {}
+
 TraceRaysTrianglesPipeline::~TraceRaysTrianglesPipeline() noexcept(false) {
-    if (was_disposed) {
+    const auto device = std::exchange(this->device, -1);
+    if (device == -1) {
         return;
     }
     CUDA_CHECK(cudaSetDevice(device));

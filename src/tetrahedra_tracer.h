@@ -17,7 +17,7 @@ extern unsigned char ptx_code_file_triangles[];
 
 class TetrahedraStructure {
    public:
-    TetrahedraStructure() = default;
+    TetrahedraStructure() noexcept;
     TetrahedraStructure(const OptixDeviceContext &context, const uint8_t device) : device(device), context(context) {}
     TetrahedraStructure(
         const OptixDeviceContext &context,
@@ -30,24 +30,33 @@ class TetrahedraStructure {
     }
 
     ~TetrahedraStructure() noexcept(false) {
-        release();
+        if (this->device != -1) {
+            release();
+        }
+        const auto device = std::exchange(this->device, -1);
     }
     TetrahedraStructure(const TetrahedraStructure &) = delete;
     TetrahedraStructure &operator=(const TetrahedraStructure &) = delete;
+    TetrahedraStructure(TetrahedraStructure &&other) noexcept;
     TetrahedraStructure &operator=(TetrahedraStructure &&other) {
-        context = std::exchange(other.context, nullptr);
-        device = std::exchange(other.device, 0);
-        num_vertices = std::exchange(other.num_vertices, 0);
-        num_cells = std::exchange(other.num_cells, 0);
-        gas_handle_ = std::exchange(other.gas_handle_, 0);
-        d_gas_output_buffer = std::exchange(other.d_gas_output_buffer, 0);
-        tetrahedra_vertices = std::exchange(other.tetrahedra_vertices, nullptr);
-        triangle_indices_ = std::exchange(other.triangle_indices_, nullptr);
-        triangle_tetrahedra_ = std::exchange(other.triangle_tetrahedra_, nullptr);
+        using std::swap;
+        if (this != &other) {
+            TetrahedraStructure tmp(std::move(other));
+            swap(tmp, *this);
+        }
         return *this;
     }
-    TetrahedraStructure(TetrahedraStructure &&other) {
-        *this = std::move(other);
+    friend void swap(TetrahedraStructure &first, TetrahedraStructure &second) {
+        using std::swap;
+        swap(first.context, second.context);
+        swap(first.device, second.device);
+        swap(first.num_vertices, second.num_vertices);
+        swap(first.num_cells, second.num_cells);
+        swap(first.gas_handle_, second.gas_handle_);
+        swap(first.d_gas_output_buffer, second.d_gas_output_buffer);
+        swap(first.tetrahedra_vertices, second.tetrahedra_vertices);
+        swap(first.triangle_indices_, second.triangle_indices_);
+        swap(first.triangle_tetrahedra_, second.triangle_tetrahedra_);
     }
 
     OptixTraversableHandle gas_handle() const {
@@ -78,7 +87,7 @@ class TetrahedraStructure {
 
     void release();
     OptixDeviceContext context = nullptr;
-    int8_t device = 0;
+    int8_t device = -1;
     size_t num_vertices = 0;
     size_t num_cells = 0;
     OptixTraversableHandle gas_handle_ = 0;
@@ -94,25 +103,32 @@ class TraceRaysPipeline {
     TraceRaysPipeline(const OptixDeviceContext &context, int8_t device);
     TraceRaysPipeline(const TraceRaysPipeline &) = delete;
     TraceRaysPipeline &operator=(const TraceRaysPipeline &) = delete;
+    TraceRaysPipeline(TraceRaysPipeline &&other) noexcept;
     TraceRaysPipeline &operator=(TraceRaysPipeline &&other) {
-        context = std::exchange(other.context, nullptr);
-        device = std::exchange(other.device, 0);
-        module = std::exchange(other.module, nullptr);
-        sbt = std::exchange(other.sbt, {});
-        pipeline = std::exchange(other.pipeline, nullptr);
-        d_param = std::exchange(other.d_param, 0);
-        stream = std::exchange(other.stream, nullptr);
-        raygen_prog_group = std::exchange(other.raygen_prog_group, nullptr);
-        miss_prog_group = std::exchange(other.miss_prog_group, nullptr);
-        hitgroup_prog_group = std::exchange(other.hitgroup_prog_group, nullptr);
-        was_disposed = std::exchange(other.was_disposed, true);
+        using std::swap;
+        if (this != &other) {
+            TraceRaysPipeline tmp(std::move(other));
+            swap(tmp, *this);
+        }
         return *this;
     }
-    TraceRaysPipeline(TraceRaysPipeline &&other) {
-        *this = std::move(other);
+    ~TraceRaysPipeline() noexcept(false);
+
+    friend void swap(TraceRaysPipeline &first, TraceRaysPipeline &second) {
+        using std::swap;
+        swap(first.context, second.context);
+        swap(first.device, second.device);
+        swap(first.module, second.module);
+        swap(first.sbt, second.sbt);
+        swap(first.pipeline, second.pipeline);
+        swap(first.d_param, second.d_param);
+        swap(first.stream, second.stream);
+        swap(first.raygen_prog_group, second.raygen_prog_group);
+        swap(first.miss_prog_group, second.miss_prog_group);
+        swap(first.hitgroup_prog_group, second.hitgroup_prog_group);
+        swap(first.eps, second.eps);
     }
 
-    ~TraceRaysPipeline() noexcept(false);
     void trace_rays(
         const TetrahedraStructure *tetrahedra_structure,
         const size_t num_rays,
@@ -128,7 +144,7 @@ class TraceRaysPipeline {
    private:
     // Context, streams, and accel structures are inherited
     OptixDeviceContext context = nullptr;
-    int8_t device = 0;
+    int8_t device = -1;
 
     // Local fields used for this pipeline
     OptixModule module = nullptr;
@@ -140,7 +156,6 @@ class TraceRaysPipeline {
     OptixProgramGroup raygen_prog_group = nullptr;
     OptixProgramGroup miss_prog_group = nullptr;
     OptixProgramGroup hitgroup_prog_group = nullptr;
-    bool was_disposed = false;
     float eps = 1e-6;
 
     static std::string load_ptx_data() {
@@ -154,25 +169,30 @@ class TraceRaysTrianglesPipeline {
     TraceRaysTrianglesPipeline(const OptixDeviceContext &context, int8_t device);
     TraceRaysTrianglesPipeline(const TraceRaysTrianglesPipeline &) = delete;
     TraceRaysTrianglesPipeline &operator=(const TraceRaysTrianglesPipeline &) = delete;
+    TraceRaysTrianglesPipeline(TraceRaysTrianglesPipeline &&other) noexcept;
     TraceRaysTrianglesPipeline &operator=(TraceRaysTrianglesPipeline &&other) {
-        context = std::exchange(other.context, nullptr);
-        device = std::exchange(other.device, 0);
-        module = std::exchange(other.module, nullptr);
-        sbt = std::exchange(other.sbt, {});
-        pipeline = std::exchange(other.pipeline, nullptr);
-        d_param = std::exchange(other.d_param, 0);
-        stream = std::exchange(other.stream, nullptr);
-        raygen_prog_group = std::exchange(other.raygen_prog_group, nullptr);
-        miss_prog_group = std::exchange(other.miss_prog_group, nullptr);
-        hitgroup_prog_group = std::exchange(other.hitgroup_prog_group, nullptr);
-        was_disposed = std::exchange(other.was_disposed, true);
+        using std::swap;
+        if (this != &other) {
+            TraceRaysTrianglesPipeline tmp(std::move(other));
+            swap(tmp, *this);
+        }
         return *this;
     }
-    TraceRaysTrianglesPipeline(TraceRaysTrianglesPipeline &&other) {
-        *this = std::move(other);
+    ~TraceRaysTrianglesPipeline() noexcept(false);
+    friend void swap(TraceRaysTrianglesPipeline &first, TraceRaysTrianglesPipeline &second) {
+        using std::swap;
+        swap(first.context, second.context);
+        swap(first.device, second.device);
+        swap(first.module, second.module);
+        swap(first.sbt, second.sbt);
+        swap(first.pipeline, second.pipeline);
+        swap(first.d_param, second.d_param);
+        swap(first.stream, second.stream);
+        swap(first.raygen_prog_group, second.raygen_prog_group);
+        swap(first.miss_prog_group, second.miss_prog_group);
+        swap(first.hitgroup_prog_group, second.hitgroup_prog_group);
     }
 
-    ~TraceRaysTrianglesPipeline() noexcept(false);
     void trace_rays(
         const TetrahedraStructure *tetrahedra_structure,
         const size_t num_rays,
@@ -188,7 +208,7 @@ class TraceRaysTrianglesPipeline {
    private:
     // Context, streams, and accel structures are inherited
     OptixDeviceContext context = nullptr;
-    int8_t device = 0;
+    int8_t device = -1;
 
     // Local fields used for this pipeline
     OptixModule module = nullptr;
@@ -200,7 +220,6 @@ class TraceRaysTrianglesPipeline {
     OptixProgramGroup raygen_prog_group = nullptr;
     OptixProgramGroup miss_prog_group = nullptr;
     OptixProgramGroup hitgroup_prog_group = nullptr;
-    bool was_disposed = false;
 
     static std::string load_ptx_data() {
         return std::string((char *)ptx_code_file_triangles);
@@ -214,25 +233,30 @@ class FindTetrahedraPipeline {
     FindTetrahedraPipeline(const OptixDeviceContext &context, int8_t device);
     FindTetrahedraPipeline(const FindTetrahedraPipeline &) = delete;
     FindTetrahedraPipeline &operator=(const FindTetrahedraPipeline &) = delete;
+    FindTetrahedraPipeline(FindTetrahedraPipeline &&other) noexcept;
     FindTetrahedraPipeline &operator=(FindTetrahedraPipeline &&other) {
-        context = std::exchange(other.context, nullptr);
-        device = std::exchange(other.device, 0);
-        module = std::exchange(other.module, nullptr);
-        sbt = std::exchange(other.sbt, {});
-        pipeline = std::exchange(other.pipeline, nullptr);
-        d_param = std::exchange(other.d_param, 0);
-        stream = std::exchange(other.stream, nullptr);
-        raygen_prog_group = std::exchange(other.raygen_prog_group, nullptr);
-        miss_prog_group = std::exchange(other.miss_prog_group, nullptr);
-        hitgroup_prog_group = std::exchange(other.hitgroup_prog_group, nullptr);
-        was_disposed = std::exchange(other.was_disposed, true);
+        using std::swap;
+        if(this != &other) {
+            FindTetrahedraPipeline tmp(std::move(other));
+            swap(tmp, *this);
+        }
         return *this;
     }
-    FindTetrahedraPipeline(TraceRaysPipeline &&other) {
-        *this = std::move(other);
+    ~FindTetrahedraPipeline() noexcept(false);
+    friend void swap(FindTetrahedraPipeline &first, FindTetrahedraPipeline &second) {
+        using std::swap;
+        swap(first.context, second.context);
+        swap(first.device, second.device);
+        swap(first.module, second.module);
+        swap(first.sbt, second.sbt);
+        swap(first.pipeline, second.pipeline);
+        swap(first.d_param, second.d_param);
+        swap(first.stream, second.stream);
+        swap(first.raygen_prog_group, second.raygen_prog_group);
+        swap(first.miss_prog_group, second.miss_prog_group);
+        swap(first.hitgroup_prog_group, second.hitgroup_prog_group);
     }
 
-    ~FindTetrahedraPipeline() noexcept(false);
     void find_tetrahedra(const TetrahedraStructure *tetrahedra_structure,
                          const size_t num_points,
                          const float3 *points,
@@ -243,7 +267,7 @@ class FindTetrahedraPipeline {
    private:
     // Context, streams, and accel structures are inherited
     OptixDeviceContext context = nullptr;
-    int8_t device = 0;
+    int8_t device = -1;
 
     // Local fields used for this pipeline
     OptixModule module = nullptr;
@@ -255,7 +279,6 @@ class FindTetrahedraPipeline {
     OptixProgramGroup raygen_prog_group = nullptr;
     OptixProgramGroup miss_prog_group = nullptr;
     OptixProgramGroup hitgroup_prog_group = nullptr;
-    bool was_disposed = false;
     float eps = 1e-6;
 
     static std::string load_ptx_data() {
@@ -270,17 +293,20 @@ class TetrahedraTracer {
     TetrahedraTracer(const TetrahedraTracer &) = delete;
     TetrahedraTracer &operator=(const TetrahedraTracer &) = delete;
     TetrahedraTracer &operator=(TetrahedraTracer &&other) {
-        context = std::exchange(other.context, nullptr);
-        device = std::exchange(other.device, 0);
-        tetrahedra_structure = std::move(other.tetrahedra_structure);
-        find_tetrahedra_pipeline = std::move(other.find_tetrahedra_pipeline);
-        trace_rays_pipeline = std::move(other.trace_rays_pipeline);
-        trace_rays_triangles_pipeline = std::move(other.trace_rays_triangles_pipeline);
+        using std::swap;
+        if (this != &other) {
+            TetrahedraTracer tmp(std::move(other));
+            swap(tmp, *this);
+        }
         return *this;
     }
-    TetrahedraTracer(TetrahedraTracer &&other) {
-        *this = std::move(other);
-    }
+    TetrahedraTracer(TetrahedraTracer &&other)
+        : context(std::exchange(other.context, nullptr)),
+          device(std::exchange(other.device, -1)),
+          tetrahedra_structure(std::move(other.tetrahedra_structure)),
+          find_tetrahedra_pipeline(std::move(other.find_tetrahedra_pipeline)),
+          trace_rays_pipeline(std::move(other.trace_rays_pipeline)),
+          trace_rays_triangles_pipeline(std::move(other.trace_rays_triangles_pipeline)) {}
 
     // Loads the tetrahedra and builds an accel structure
     // NOTE: the d_vertices and cells arrays are not copied!
