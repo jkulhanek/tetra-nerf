@@ -42,6 +42,7 @@ RUN pip uninstall -y lerf && \
 USER root
 RUN rm -rf /opt/optix && \
     [ -e /usr/bin/python ] || ln -s /usr/bin/python3 /usr/bin/python
+RUN chmod -R go=u /home/user
 USER 1000
 
 CMD /bin/bash -l

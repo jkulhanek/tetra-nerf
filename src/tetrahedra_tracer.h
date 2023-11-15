@@ -29,12 +29,7 @@ class TetrahedraStructure {
         build(num_vertices, num_cells, d_vertices, cells);
     }
 
-    ~TetrahedraStructure() noexcept(false) {
-        if (this->device != -1) {
-            release();
-        }
-        const auto device = std::exchange(this->device, -1);
-    }
+    ~TetrahedraStructure() noexcept(false);
     TetrahedraStructure(const TetrahedraStructure &) = delete;
     TetrahedraStructure &operator=(const TetrahedraStructure &) = delete;
     TetrahedraStructure(TetrahedraStructure &&other) noexcept;
@@ -300,13 +295,7 @@ class TetrahedraTracer {
         }
         return *this;
     }
-    TetrahedraTracer(TetrahedraTracer &&other)
-        : context(std::exchange(other.context, nullptr)),
-          device(std::exchange(other.device, -1)),
-          tetrahedra_structure(std::move(other.tetrahedra_structure)),
-          find_tetrahedra_pipeline(std::move(other.find_tetrahedra_pipeline)),
-          trace_rays_pipeline(std::move(other.trace_rays_pipeline)),
-          trace_rays_triangles_pipeline(std::move(other.trace_rays_triangles_pipeline)) {}
+    TetrahedraTracer(TetrahedraTracer &&other);
 
     // Loads the tetrahedra and builds an accel structure
     // NOTE: the d_vertices and cells arrays are not copied!

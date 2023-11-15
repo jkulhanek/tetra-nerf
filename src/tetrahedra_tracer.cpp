@@ -126,6 +126,14 @@ TetrahedraTracer::TetrahedraTracer(int8_t device) : device(device) {
     tetrahedra_structure = std::move(TetrahedraStructure(context, device));
 }
 
+TetrahedraTracer::TetrahedraTracer(TetrahedraTracer &&other)
+    : context(std::exchange(other.context, nullptr)),
+        device(std::exchange(other.device, -1)),
+        tetrahedra_structure(std::move(other.tetrahedra_structure)),
+        find_tetrahedra_pipeline(std::move(other.find_tetrahedra_pipeline)),
+        trace_rays_pipeline(std::move(other.trace_rays_pipeline)),
+        trace_rays_triangles_pipeline(std::move(other.trace_rays_triangles_pipeline)) {}
+
 void TraceRaysPipeline::trace_rays(const TetrahedraStructure *tetrahedra_structure,
                                    const size_t num_rays,
                                    const unsigned int max_ray_triangles,
@@ -224,6 +232,13 @@ void TetrahedraStructure::release() {
         CUDA_CHECK(cudaFree(reinterpret_cast<void *>(triangle_tetrahedra_)));
         triangle_tetrahedra_ = nullptr;
     }
+}
+
+TetrahedraStructure::~TetrahedraStructure() noexcept(false) {
+    if (this->device != -1) {
+        release();
+    }
+    const auto device = std::exchange(this->device, -1);
 }
 
 void TetrahedraStructure::build(const size_t num_vertices,
