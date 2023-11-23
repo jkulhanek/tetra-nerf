@@ -5,7 +5,7 @@ import sys
 from distutils.cmd import Command
 from pathlib import Path
 
-from setuptools import Extension, setup
+from setuptools import Extension, setup, find_packages
 
 # Convert distutils Windows platform specifiers to CMake -A arguments
 PLAT_TO_CMAKE = {
@@ -126,11 +126,13 @@ setup(
     author_email="jonas.kulhanek@live.com",
     description="Official implementation of Tetra-NeRF paper",
     long_description="",
-    ext_modules=[CMakeExtension("cmake_example")],
-    cmdclass={"build_ext": CMakeBuild},
+    # ext_modules=[CMakeExtension("cmake_example")],
+    # cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,
     python_requires=">=3.7",
     install_requires=["trimesh>=3.20.2", "nerfstudio>=0.2.0"],
+    packages=find_packages(),
+    package_data={"tetranerf.utils.extension": ["py.typed", "**/*.pyi"]},
     entry_points={
         "nerfstudio.method_configs": [
             "tetra-nerf = tetranerf.nerfstudio.registration:tetranerf",
