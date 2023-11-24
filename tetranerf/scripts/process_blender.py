@@ -78,8 +78,8 @@ def entrypoint(
         rename_map = {}
         with status(status="[bold yellow]Copying images...", visible=not verbose):
             (tmpoutput / "images").mkdir(parents=True, exist_ok=True)
-            for i, f in enumerate(frames):
-                source: Path = transforms.parent / (f["file_path"] + ".png")
+            for i, fr in enumerate(frames):
+                source: Path = transforms.parent / (fr["file_path"] + ".png")
                 target = tmpoutput / "images" / f"frame_{i+1:05d}.png"
                 rename_map[source.name] = target.name
                 if not target.exists():
@@ -142,14 +142,14 @@ def entrypoint(
                 id_map = {x[1]: x[0] for x in db_images}
 
                 images = {}
-                for i, f in enumerate(frames):
-                    c2w = np.array(f["transform_matrix"])
+                for i, fr in enumerate(frames):
+                    c2w = np.array(fr["transform_matrix"])
                     c2w[0:3, 1:3] *= -1
                     w2c = np.linalg.inv(c2w)
 
                     qvec = colmap_utils.rotmat2qvec(w2c[:3, :3])
                     tvec = w2c[:3, 3]
-                    name = Path(f["file_path"]).name + ".png"
+                    name = Path(fr["file_path"]).name + ".png"
                     name = rename_map.get(name, name)
                     images[id_map[name]] = colmap_utils.Image(id_map[name], qvec, tvec, 1, name, [], [])
                 colmap_utils.write_images_binary(images, output / "sparse" / "images.bin")

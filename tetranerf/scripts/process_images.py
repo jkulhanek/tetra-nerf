@@ -29,7 +29,7 @@ def colmap_to_minimal_parser_format(
     images = list(images.values())
     images.sort(key=lambda x: x.name)
 
-    c2ws = []
+    c2ws_list = []
     file_paths = []
     for i, im_data in enumerate(images):
         rotation = colmap_utils.qvec2rotmat(im_data.qvec)
@@ -38,12 +38,12 @@ def colmap_to_minimal_parser_format(
         w2c = np.concatenate([w2c, np.array([[0, 0, 0, 1]])], 0)
         c2w = np.linalg.inv(w2c)
         c2w[0:3, 1:3] *= -1
-        c2ws.append(c2w)
+        c2ws_list.append(c2w)
         file_path = Path(f"images_{downscale_factor}/{im_data.name}")
         file_paths.append(str(file_path))
         if i == 0:
             real_width, real_height = Image.open(output / file_path).size
-    c2ws = np.stack(c2ws, 0)
+    c2ws = np.stack(c2ws_list, 0)
     out = {}
     if transform_poses:
         c2ws, applied_transform, applied_scale = _transform_poses(c2ws)

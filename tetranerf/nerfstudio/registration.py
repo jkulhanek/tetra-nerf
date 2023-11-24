@@ -1,3 +1,4 @@
+import typing
 from functools import partial
 import dataclasses
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManagerConfig
@@ -11,7 +12,7 @@ try:
     DPConfig = partial(ColmapDataParserConfig, load_3D_points=True)
 except ImportError:
     # Older NerfStudio versions
-    from nerfstudio.data.dataparsers.minimal_dataparser import MinimalDataParserConfig as DPConfig
+    from nerfstudio.data.dataparsers.minimal_dataparser import MinimalDataParserConfig as DPConfig  # type: ignore
 
 from .model import TetrahedraNerf, TetrahedraNerfConfig
 from .pipeline import TetrahedraNerfPipeline
@@ -50,7 +51,7 @@ tetranerf_config = dataclasses.replace(
     pipeline=dataclasses.replace(
         tetranerf_original_config.pipeline,
         model=dataclasses.replace(
-            tetranerf_original_config.pipeline.model,
+            typing.cast(TetrahedraNerfConfig, tetranerf_original_config.pipeline.model),
             num_samples=128,
             num_fine_samples=128,
             use_biased_sampler=True,

@@ -234,7 +234,7 @@ class TetrahedraNerf(Model):
         if self.config.tetrahedra_path is None and metadata is not None and "points3D_xyz" in metadata:
             self._load_points_from_metadata(**metadata)
         else:
-            if self.config.num_tetrahedra_vertices is None:
+            if self.config.num_tetrahedra_vertices is None or self.config.num_tetrahedra_cells is None:
                 raise RuntimeError("The tetrahedra_path must be specified.")
             self.register_buffer(
                 "tetrahedra_vertices",
@@ -478,13 +478,13 @@ class TetrahedraNerf(Model):
         # self.lpips_vgg = LearnedPerceptualImagePatchSimilarity(net_type="vgg")
 
     # Just to allow for size reduction of the checkpoint
-    def load_state_dict(self, state_dict, strict: bool = True):
+    def load_state_dict(self, state_dict, *args, **kwargs):
         for k, v in self.lpips.state_dict().items():
             state_dict[f"lpips.{k}"] = v
         if hasattr(self, "lpips_vgg"):
             for k, v in self.lpips_vgg.state_dict().items():
                 state_dict[f"lpips_vgg.{k}"] = v
-        return super().load_state_dict(state_dict, strict)
+        return super().load_state_dict(state_dict, *args, **kwargs)
 
     # Just to allow for size reduction of the checkpoint
     def state_dict(self, *args, prefix="", **kwargs):
@@ -518,6 +518,7 @@ class TetrahedraNerf(Model):
         return background_color.expand(shape).to(device).contiguous()
 
     def get_outputs(self, ray_bundle: RayBundle):
+        assert self.collider is not None
         if self.mlp_base is None:
             raise ValueError("populate_fields() must be called before get_outputs")
 
@@ -544,14 +545,15 @@ class TetrahedraNerf(Model):
 
             # Apply biased sampling
             visited_tetrahedra = tracer_output["visited_cells"][ray_mask]
+            ray_samples_r: RaySamples
             if isinstance(self.sampler_uniform, TetrahedraSampler):
-                ray_samples_r: RaySamples = self.sampler_uniform(
+                ray_samples_r = self.sampler_uniform(
                     ray_bundle_modified_r,
                     num_visited_cells=tracer_output["num_visited_cells"][ray_mask],
                     hit_distances=tracer_output["hit_distances"][ray_mask],
                 )
             else:
-                ray_samples_r: RaySamples = self.sampler_uniform(ray_bundle_modified_r)
+                ray_samples_r = self.sampler_uniform(ray_bundle_modified_r)
             distances_r = (ray_samples_r.frustums.ends + ray_samples_r.frustums.starts) / 2
 
             # Trace matched cells and interpolate field
@@ -607,6 +609,7 @@ class TetrahedraNerf(Model):
             if self.config.appearance_embed_dim > 0:
                 # appearance
                 if self.training:
+                    assert ray_samples_r.camera_indices is not None
                     camera_indices = ray_samples_r.camera_indices.squeeze()
                     embedded_appearance = self.appearance_embedding(camera_indices)
                 else:
