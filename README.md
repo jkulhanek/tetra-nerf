@@ -1,9 +1,10 @@
 # Tetra-NeRF
 Official implementation of **Tetra-NeRF paper**
 
-### [Project Page](https://jkulhanek.com/tetra-nerf) | [Paper](https://arxiv.org/pdf/2304.09987.pdf) | [Demo](https://jkulhanek.com/tetra-nerf/demo.html)<br><br>
+### [Project Page](https://jkulhanek.com/tetra-nerf) | [Paper](https://arxiv.org/pdf/2304.09987.pdf) | [Demo](https://jkulhanek.com/tetra-nerf/demo.html)<br>
 [Tetra-NeRF: Representing Neural Radiance Fields Using Tetrahedra](https://jkulhanek.com/tetra-nerf)<br>
 *[Jonas Kulhanek](https://jkulhanek.com)<sup>1</sup>, [Torsten Sattler](https://tsattler.github.io/)<sup>1</sup>*<br>
+***ICCV 2023***<br>
 <sup>1</sup> Czech Technical University in Prague<br>
 
 ![method overview](https://jkulhanek.com/tetra-nerf/resources/overview-white.svg)<br>
