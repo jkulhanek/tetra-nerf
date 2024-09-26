@@ -44,6 +44,15 @@ h1 .title-small  {
   font-weight: 500;
 }
 
+header .conference {
+  text-align: center;
+  margin: -0.8rem 0 1rem 0;
+  font-size: 1.4rem;
+  color: #666;
+  font-style: italic;
+  font-weight: 600;
+}
+
 .authors {
   display: flex;
   justify-content: center;
